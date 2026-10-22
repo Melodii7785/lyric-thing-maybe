@@ -38,7 +38,7 @@ p{color:#cbbdce;line-height:1.65}.panel{background:#27212d;border:1px solid #403
     <h2>the words™</h2>
     <p id="lyrics-meta">Waiting for lyrics…</p>
     <div id="lyrics" aria-live="polite"></div>
-    <p class="muted">Lyrics provided by <a href="https://lrc.red" target="_blank" rel="noreferrer" style="color:#f49ac2">lrc.red</a>. Word timing is shown when available in the TTML file.</p>
+    <p class="muted" id="lyrics-attribution">Lyrics provider attribution will appear here.</p>
   </div>
 </section>
 <p class="muted">Experimental lyric lookup. Synced lyrics highlight by line when timing data is available.</p>
@@ -59,7 +59,76 @@ async function api(path, options={}) {
   return data;
 }
 function clearTrack(){ $('track').hidden=true; $('cover').style.display='none'; }
-function clearLyrics(){ lyricLines=[]; activeLyric=-1; $('lyrics').replaceChildren(); $('lyrics-panel').hidden=true; }
+function clearLyrics(){ lyricLines=[]; activeLyric=-1; $('lyrics').replaceChildren(); $('lyrics-panel').hidden=true; $('lyrics-attribution').replaceChildren(); }
+function setAttribution(source, uploadAttribution){
+  const target=$('lyrics-attribution');
+  target.replaceChildren();
+  const names={spicy_lyrics:'Spicy Lyrics',apple_music:'Apple Music',spotify:'Spotify','lrc.red':'lrc.red'};
+  const provider=names[source] || 'Unknown source';
+  target.append('Lyrics provided by ');
+  const providerLink=document.createElement('a');
+  providerLink.href=source==='lrc.red'?'https://lrc.red/':source==='spicy_lyrics'?'https://spicylyrics.org/': 'https://developers.spicylyrics.org/';
+  providerLink.target='_blank'; providerLink.rel='noreferrer'; providerLink.style.color='#f49ac2'; providerLink.textContent=provider;
+  target.append(providerLink);
+  if(source==='spicy_lyrics' && uploadAttribution){
+    const addCredit=(label,person)=>{
+      if(!person || !person.username) return;
+      target.append(' · '+label+' ');
+      const link=document.createElement('a');
+      link.textContent=person.username;
+      link.href=typeof person.url==='string' && person.url.startsWith('https://') ? person.url : 'https://spicylyrics.org/';
+      link.target='_blank'; link.rel='noreferrer'; link.style.color='#f49ac2';
+      target.append(link);
+    };
+    addCredit('uploaded by',uploadAttribution.Uploader);
+    addCredit('made by',uploadAttribution.Maker);
+  }
+}
+function renderSpicyLyrics(data){
+  clearLyrics();
+  $('lyrics-panel').hidden=false;
+  const body=data.spicyLyrics||{};
+  const content=Array.isArray(body.Content)?body.Content:[];
+  lyricLines=content.map(entry=>{
+    const lead=entry?.Lead||{};
+    const syllables=Array.isArray(lead.Syllables)?lead.Syllables.map(s=>({
+      text:typeof s.Text==='string'?s.Text:'',
+      time:Number.isFinite(s.StartTime)?s.StartTime:null,
+      endTime:Number.isFinite(s.EndTime)?s.EndTime:null
+    })).filter(s=>s.text):[];
+    const text=syllables.length?syllables.map(s=>s.text).join(''):(lead.Text||lead.TransliteratedText||lead.TranslatedText||entry?.Text||'');
+    const candidateTimes=[lead.StartTime,entry?.StartTime,syllables[0]?.time,body.StartTime];
+    const time=candidateTimes.find(t=>typeof t==='number'&&Number.isFinite(t));
+    return {time:time??0,text,words:syllables};
+  }).filter(line=>line.text.trim());
+  setAttribution(body.source,body.UploadAttribution);
+  if(!lyricLines.length){
+    $('lyrics-meta').textContent='Spicy Lyrics returned a response, but it contained no renderable lyric lines.';
+    return;
+  }
+  const hasWordTiming=lyricLines.some(line=>line.words.some(word=>word.time!==null));
+  $('lyrics-meta').textContent=body.Type==='Syllable'&&hasWordTiming
+    ? 'Spicy Lyrics · word/syllable timing loaded.'
+    : body.Type==='Line'
+      ? 'Spicy Lyrics · line-synced lyrics.'
+      : 'Spicy Lyrics · lyrics loaded.';
+  const fragment=document.createDocumentFragment();
+  lyricLines.forEach((line,index)=>{
+    const el=document.createElement('div');
+    el.className='lyric-line'; el.dataset.index=String(index);
+    if(line.words.length){
+      line.words.forEach((word,wordIndex)=>{
+        const span=document.createElement('span');
+        span.className='word'; span.textContent=word.text;
+        span.dataset.wordIndex=String(wordIndex);
+        el.appendChild(span);
+      });
+    }else el.textContent=line.text;
+    fragment.appendChild(el);
+  });
+  $('lyrics').appendChild(fragment);
+  updateActiveLyric();
+}
 function timeSeconds(value){
   if(!value) return null;
   const parts=value.trim().split(':');
@@ -84,6 +153,7 @@ function parseTtml(value){
 function renderLyrics(data){
   clearLyrics();
   $('lyrics-panel').hidden=false;
+  setAttribution('lrc.red');
   lyricLines=parseTtml(data.ttml||'');
   lyricsAreSynced=lyricLines.some(line=>line.words.some(word=>word.time!==null));
   if(!lyricLines.length){
@@ -175,11 +245,12 @@ async function findLyrics(){
   $('find-lyrics').disabled=true;
   $('find-lyrics').textContent='Looking…';
   $('lyrics-panel').hidden=false;
-  $('lyrics-meta').textContent='Looking up the Spotify recording on lrc.red…';
+  $('lyrics-meta').textContent='Asking Spicy Lyrics for the best available sync…';
   $('lyrics').replaceChildren();
   try{
     const data=await api('/api/lyrics');
-    renderLyrics(data);
+    if(data.spicyLyrics) renderSpicyLyrics(data);
+    else renderLyrics(data);
   }catch(e){
     $('lyrics-panel').hidden=false;
     $('lyrics-meta').textContent=e.message==='lyrics_not_found'
