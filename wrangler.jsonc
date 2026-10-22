@@ -23,6 +23,7 @@
   ],
   "vars": {
     "APP_ORIGIN": "https://lyricthing.melodii7785.workers.dev",
+    "CLIENT_ID": "2298bfff363944bfa2b6818eb5f7a2cf",
     "SPOTIFY_REDIRECT_URI": "https://lyricthing.melodii7785.workers.dev/auth/callback"
   }
 }
