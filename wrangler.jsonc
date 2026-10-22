@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "lyric-thing",
+  "name": "lyricthing",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-22",
   "assets": {
@@ -22,7 +22,7 @@
     }
   ],
   "vars": {
-    "APP_ORIGIN": "http://localhost:8787",
-    "SPOTIFY_REDIRECT_URI": "http://localhost:8787/auth/callback"
+    "APP_ORIGIN": "https://lyricthing.melodii7785.workers.dev",
+    "SPOTIFY_REDIRECT_URI": "https://lyricthing.melodii7785.workers.dev/auth/callback"
   }
 }
