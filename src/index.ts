@@ -257,17 +257,26 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
     let ttml: string | null = null;
     let providerStatus = 404;
-    for (const candidate of candidates.slice(0, 8)) {
-      const lyricsResponse = await fetch("https://lrc.red/s/" + encodeURIComponent(candidate) + ".ttml", {
-        headers: { accept: "application/ttml+xml, application/xml, text/xml, */*" },
-      });
-      if (lyricsResponse.status === 404) continue;
-      if (!lyricsResponse.ok) { providerStatus = lyricsResponse.status; continue; }
-      const candidateTtml = await lyricsResponse.text();
-      if (candidateTtml.trim() && candidateTtml.includes("<")) {
-        ttml = candidateTtml;
-        break;
+    async function tryCandidates(list: string[]): Promise<void> {
+      for (const candidate of list.slice(0, 8)) {
+        const lyricsResponse = await fetch("https://lrc.red/s/" + encodeURIComponent(candidate) + ".ttml", {
+          headers: { accept: "application/ttml+xml, application/xml, text/xml, */*" },
+        });
+        if (lyricsResponse.status === 404) continue;
+        if (!lyricsResponse.ok) { providerStatus = lyricsResponse.status; continue; }
+        const candidateTtml = await lyricsResponse.text();
+        if (candidateTtml.trim() && candidateTtml.includes("<")) {
+          ttml = candidateTtml;
+          return;
+        }
       }
+    }
+    await tryCandidates(candidates);
+    if (!ttml) {
+      const query = new URLSearchParams({ q: [track.name ?? "", ...artists].join(" ") });
+      const searched = await getJson("https://lrc.red/search.json?" + query.toString());
+      const searchCandidates = collectIsrcs(searched).filter(candidate => !candidates.includes(candidate));
+      await tryCandidates(searchCandidates);
     }
     if (!ttml) {
       if (providerStatus !== 404) return json({ error: "lyrics_provider_failed", status: providerStatus }, 502);
