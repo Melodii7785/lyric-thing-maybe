@@ -215,21 +215,62 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const playback = await playbackResponse.json() as any;
     const track = playback?.item;
     if (!track) return json({ error: "nothing_playing" }, 404);
-    const isrc = track.external_ids?.isrc;
     const artists = Array.isArray(track.artists) ? track.artists.map((artist: any) => artist.name).filter(Boolean) : [];
-    if (!isrc) return json({ error: "track_isrc_unavailable", track: { title: track.name, artists } }, 422);
+    const album = track.album?.name ?? null;
+    const durationSeconds = typeof track.duration_ms === "number" ? Math.round(track.duration_ms / 1000) : null;
+    let isrc = track.external_ids?.isrc ?? null;
 
-    const lyricsResponse = await fetch("https://lrc.red/s/" + encodeURIComponent(isrc) + ".ttml", {
+    // Spotify's currently-playing response often omits external_ids. Ask lrc.red
+    // to identify the recording from the title/artist metadata in that case.
+    async function matchIsrc(): Promise<string | null> {
+      const params = new URLSearchParams({
+        "song-title": track.name ?? "",
+        "song-artist": artists.join(", "),
+      });
+      if (album) params.set("song-album", album);
+      if (durationSeconds) params.set("song-duration", String(durationSeconds));
+      const response = await fetch("https://lrc.red/match.json?" + params.toString(), {
+        headers: { accept: "application/json" },
+      });
+      if (!response.ok) return null;
+      const payload = await response.json() as any;
+      const find = (value: any): string | null => {
+        if (!value || typeof value !== "object") return null;
+        if (typeof value.isrc === "string" && value.isrc.trim()) return value.isrc.trim();
+        for (const child of Object.values(value)) {
+          const found = find(child);
+          if (found) return found;
+        }
+        return null;
+      };
+      return find(payload);
+    }
+
+    if (!isrc) isrc = await matchIsrc();
+    if (!isrc) return json({
+      error: "lyrics_not_found", track: { title: track.name, artists, album },
+    }, 404);
+
+    let lyricsResponse = await fetch("https://lrc.red/s/" + encodeURIComponent(isrc) + ".ttml", {
       headers: { accept: "application/ttml+xml, application/xml, text/xml, */*" },
     });
+    if (lyricsResponse.status === 404) {
+      const matchedIsrc = await matchIsrc();
+      if (matchedIsrc && matchedIsrc !== isrc) {
+        isrc = matchedIsrc;
+        lyricsResponse = await fetch("https://lrc.red/s/" + encodeURIComponent(isrc) + ".ttml", {
+          headers: { accept: "application/ttml+xml, application/xml, text/xml, */*" },
+        });
+      }
+    }
     if (lyricsResponse.status === 404) return json({
-      error: "lyrics_not_found", track: { title: track.name, artists, album: track.album?.name ?? null },
+      error: "lyrics_not_found", track: { title: track.name, artists, album },
     }, 404);
     if (!lyricsResponse.ok) return json({ error: "lyrics_provider_failed", status: lyricsResponse.status }, 502);
     const ttml = await lyricsResponse.text();
     if (!ttml.trim() || !ttml.includes("<")) return json({ error: "lyrics_not_found" }, 404);
     return json({
-      track: { title: track.name, artists, album: track.album?.name ?? null },
+      track: { title: track.name, artists, album },
       ttml, provider: "lrc.red", providerUrl: "https://lrc.red/",
     });
   }
