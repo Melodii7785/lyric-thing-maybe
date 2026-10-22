@@ -1,3 +1,5 @@
+type KeyUsage = "encrypt" | "decrypt" | "sign" | "verify" | "deriveKey" | "deriveBits" | "wrapKey" | "unwrapKey";
+
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
