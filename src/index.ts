@@ -4,8 +4,8 @@ interface Env {
   OAUTH_STATE: KVNamespace;
   APP_ORIGIN: string;
   SPOTIFY_REDIRECT_URI: string;
-  SPOTIFY_CLIENT_ID: string;
-  SPOTIFY_CLIENT_SECRET: string;
+  CLIENT_ID: string;
+  CLIENT_SECRET: string;
   TOKEN_ENCRYPTION_KEY: string;
 }
 
@@ -96,10 +96,10 @@ async function refresh(session: Session, env: Env): Promise<Session> {
   const response = await fetch(TOKEN_URL, {
     method: "POST",
     headers: {
-      authorization: "Basic " + btoa(env.SPOTIFY_CLIENT_ID + ":" + env.SPOTIFY_CLIENT_SECRET),
+      authorization: "Basic " + btoa(env.CLIENT_ID + ":" + env.CLIENT_SECRET),
       "content-type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: env.SPOTIFY_CLIENT_ID }),
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: env.CLIENT_ID }),
   });
   if (!response.ok) throw new Error("Spotify token refresh failed");
   const token = await response.json() as TokenResponse;
@@ -121,7 +121,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     await env.OAUTH_STATE.put("state:" + state, "valid", { expirationTtl: 600 });
     const authorize = new URL("https://accounts.spotify.com/authorize");
     authorize.search = new URLSearchParams({
-      response_type: "code", client_id: env.SPOTIFY_CLIENT_ID,
+      response_type: "code", client_id: env.CLIENT_ID,
       redirect_uri: env.SPOTIFY_REDIRECT_URI,
       scope: "user-read-playback-state user-read-currently-playing", state,
     }).toString();
@@ -141,7 +141,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const tokenResponse = await fetch(TOKEN_URL, {
       method: "POST",
       headers: {
-        authorization: "Basic " + btoa(env.SPOTIFY_CLIENT_ID + ":" + env.SPOTIFY_CLIENT_SECRET),
+        authorization: "Basic " + btoa(env.CLIENT_ID + ":" + env.CLIENT_SECRET),
         "content-type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: env.SPOTIFY_REDIRECT_URI }),
