@@ -1,3 +1,4 @@
+import '@fontsource-variable/inter';
 import { LyricPlayer } from '@applemusic-like-lyrics/core';
 import '@applemusic-like-lyrics/core/style.css';
 
