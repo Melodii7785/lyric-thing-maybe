@@ -9,6 +9,7 @@ interface Env {
   CLIENT_ID: string;
   CLIENT_SECRET: string;
   TOKEN_ENCRYPTION_KEY: string;
+  SL_SECRET: string;
 }
 
 interface TokenResponse {
@@ -216,6 +217,26 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const track = playback?.item;
     if (!track) return json({ error: "nothing_playing" }, 404);
     const artists = Array.isArray(track.artists) ? track.artists.map((artist: any) => artist.name).filter(Boolean) : [];
+    const trackInfo = { title: track.name ?? "Unknown track", artists, album: track.album?.name ?? null };
+
+    // Spicy Lyrics selects the best available sync (community, Apple Music, or Spotify).
+    // The secret stays server-side; only the current track's display data is returned to the app.
+    if (env.SL_SECRET && typeof track.id === "string" && /^[A-Za-z0-9]{22}$/.test(track.id)) {
+      try {
+        const spicyResponse = await fetch("https://api.spicylyrics.org/v1/lyrics/" + encodeURIComponent(track.id), {
+          headers: { authorization: "Bearer " + env.SL_SECRET, accept: "application/json" },
+        });
+        if (spicyResponse.ok) {
+          const spicyPayload = await spicyResponse.json() as any;
+          const body = spicyPayload?.Body;
+          if (body && Array.isArray(body.Content) && body.Content.length) {
+            return json({ track: trackInfo, spicyLyrics: body });
+          }
+        }
+      } catch {
+        // If Spicy Lyrics is unavailable, keep the existing lrc.red fallback below.
+      }
+    }
     const album = track.album?.name ?? null;
     const durationSeconds = typeof track.duration_ms === "number" ? Math.round(track.duration_ms / 1000) : null;
     let isrc = track.external_ids?.isrc ?? null;
