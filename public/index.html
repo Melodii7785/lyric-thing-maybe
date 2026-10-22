@@ -14,6 +14,7 @@ h1{font-size:clamp(3rem,12vw,6rem);line-height:.95;letter-spacing:-.07em;margin:
 p{color:#cbbdce;line-height:1.65}.panel{background:#27212d;border:1px solid #403447;border-radius:22px;padding:22px;margin-top:26px}
 .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}button{border:0;border-radius:12px;padding:12px 16px;font:inherit;font-weight:750;cursor:pointer;background:#f49ac2;color:#251421}button.secondary{background:#39303f;color:#f7edf4}button:disabled{opacity:.5;cursor:wait}
 #status{font-size:.92rem;color:#d8c9db;white-space:pre-wrap;overflow-wrap:anywhere}.track{display:flex;gap:18px;align-items:center;margin-top:20px}#cover{width:112px;height:112px;object-fit:cover;border-radius:14px;background:#39303f;display:none}.track h2{font-size:1.35rem;margin:0 0 6px}.track p{margin:0}.muted{font-size:.85rem;color:#a99aae}.pill{display:inline-block;border:1px solid #66516c;border-radius:99px;padding:5px 10px;font-size:.78rem;color:#eacfe0}
+#lyrics-panel{margin-top:24px;border-top:1px solid #403447;padding-top:18px}#lyrics{max-height:48vh;overflow:auto;display:flex;flex-direction:column;gap:10px;margin-top:14px;scroll-behavior:smooth}.lyric-line{padding:7px 10px;border-radius:9px;color:#a99aae;line-height:1.5;white-space:pre-wrap}.lyric-line.active{background:#443044;color:#fff;font-weight:800;transform:scale(1.01)}#lyrics-meta{font-size:.8rem;color:#a99aae}
 </style>
 </head>
 <body>
@@ -25,6 +26,7 @@ p{color:#cbbdce;line-height:1.65}.panel{background:#27212d;border:1px solid #403
   <div class="actions">
     <button id="connect">Connect Spotify</button>
     <button class="secondary" id="check">Check playback</button>
+    <button class="secondary" id="find-lyrics" hidden>Find lyrics</button>
     <button class="secondary" id="disconnect">Disconnect</button>
   </div>
   <div id="status" role="status" aria-live="polite">Checking connection…</div>
@@ -32,11 +34,23 @@ p{color:#cbbdce;line-height:1.65}.panel{background:#27212d;border:1px solid #403
     <img id="cover" alt="Album cover">
     <div><h2 id="title">Nothing playing</h2><p id="artist"></p><p class="muted" id="album"></p><p class="muted" id="playstate"></p></div>
   </div>
+  <div id="lyrics-panel" hidden>
+    <h2>the words™</h2>
+    <p id="lyrics-meta">Waiting for lyrics…</p>
+    <div id="lyrics" aria-live="polite"></div>
+    <p class="muted">Lyrics provided by <a href="https://lrclib.net" target="_blank" rel="noreferrer" style="color:#f49ac2">LRCLIB</a>. Availability and timing depend on the source record.</p>
+  </div>
 </section>
-<p class="muted">This is the connection test screen. The lyric search interface will be wired in after Spotify playback is confirmed.</p>
+<p class="muted">Experimental lyric lookup. Synced lyrics highlight by line when timing data is available.</p>
 <script>
 const $ = id => document.getElementById(id);
 let poller = null;
+let lyricLines = [];
+let activeLyric = -1;
+let lyricsAreSynced = false;
+let latestProgressMs = 0;
+let progressObservedAt = Date.now();
+let isPlaying = false;
 function say(message){ $('status').textContent = message; }
 async function api(path, options={}) {
   const response = await fetch(path, { credentials:'same-origin', cache:'no-store', ...options });
@@ -45,13 +59,66 @@ async function api(path, options={}) {
   return data;
 }
 function clearTrack(){ $('track').hidden=true; $('cover').style.display='none'; }
+function clearLyrics(){ lyricLines=[]; activeLyric=-1; $('lyrics').replaceChildren(); $('lyrics-panel').hidden=true; }
+function parseLrc(value){
+  const out=[];
+  for(const line of value.split(/\r?\n/)){
+    const re=/\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+    let match, times=[];
+    while((match=re.exec(line))!==null){
+      const fraction=match[3] ? Number('0.'+match[3]) : 0;
+      times.push(Number(match[1])*60+Number(match[2])+fraction);
+    }
+    const text=line.replace(/\[\d{1,2}:\d{2}(?:[.:]\d{1,3})?\]/g,'').trim();
+    if(text) for(const time of times) out.push({time,text});
+  }
+  return out.sort((a,b)=>a.time-b.time);
+}
+function renderLyrics(data){
+  clearLyrics();
+  $('lyrics-panel').hidden=false;
+  if(data.instrumental){ $('lyrics-meta').textContent='This track is marked instrumental.'; return; }
+  lyricsAreSynced=!!data.syncedLyrics;
+  lyricLines=lyricsAreSynced ? parseLrc(data.syncedLyrics) : (data.plainLyrics||'').split(/\r?\n/).map(text=>({time:null,text})).filter(line=>line.text.trim());
+  if(!lyricLines.length){
+    $('lyrics-meta').textContent='A lyrics record was found, but it contains no readable lyric lines.';
+    return;
+  }
+  $('lyrics-meta').textContent=lyricsAreSynced
+    ? (data.hasWordSync ? 'Synced lyrics found · word-level timing is available in the source; line sync shown for now.' : 'Synced lyrics found · highlighting by line.')
+    : 'Only unsynced lyrics found · no timing data available.';
+  const fragment=document.createDocumentFragment();
+  lyricLines.forEach((line,index)=>{
+    const el=document.createElement('div');
+    el.className='lyric-line';
+    el.textContent=line.text;
+    el.dataset.index=String(index);
+    fragment.appendChild(el);
+  });
+  $('lyrics').appendChild(fragment);
+  if(lyricsAreSynced) updateActiveLyric();
+}
+function updateActiveLyric(){
+  if(!lyricsAreSynced||!lyricLines.length) return;
+  const progress=latestProgressMs/1000+(isPlaying?(Date.now()-progressObservedAt)/1000:0);
+  let next=-1;
+  for(let i=0;i<lyricLines.length;i++){ if(lyricLines[i].time<=progress) next=i; else break; }
+  if(next===activeLyric) return;
+  activeLyric=next;
+  document.querySelectorAll('.lyric-line.active').forEach(el=>el.classList.remove('active'));
+  if(next>=0){
+    const active=$('lyrics').querySelector('[data-index="'+next+'"]');
+    if(active){ active.classList.add('active'); active.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+  }
+}
 async function connection(){
   try {
     const data = await api('/api/session');
     $('connection').textContent = data.connected ? 'Spotify connected' : 'not connected';
     $('connect').hidden = data.connected;
+    $('find-lyrics').hidden = !data.connected;
     $('disconnect').hidden = !data.connected;
-    if (!data.connected) { clearTrack(); say('Connect Spotify to detect the track currently playing.'); stopPolling(); }
+    if (!data.connected) { clearTrack(); clearLyrics(); say('Connect Spotify to detect the track currently playing.'); stopPolling(); }
     else { say('Connected'+(data.user?.displayName ? ' as '+data.user.displayName : '')+'. Checking playback…'); await playback(); startPolling(); }
   } catch(e){ say('Could not check connection: '+e.message+'\nThe Worker may not be configured yet.'); }
 }
@@ -65,19 +132,47 @@ async function playback(){
     $('album').textContent=data.track.album || '';
     $('playstate').textContent=data.playing ? '▶ Playing' : 'Ⅱ Paused';
     if(data.track.image){ $('cover').src=data.track.image; $('cover').style.display='block'; } else $('cover').style.display='none';
+    latestProgressMs=Number(data.progressMs||0);
+    progressObservedAt=Date.now();
+    isPlaying=!!data.playing;
+    updateActiveLyric();
     say('Playback detected successfully.');
   } catch(e) {
     clearTrack();
-    if(e.message==='not_connected'||e.message==='spotify_reconnect_required'){ say('Spotify needs to be connected again.'); stopPolling(); $('connection').textContent='not connected'; $('connect').hidden=false; $('disconnect').hidden=true; }
+    if(e.message==='not_connected'||e.message==='spotify_reconnect_required'){ say('Spotify needs to be connected again.'); stopPolling(); $('connection').textContent='not connected'; $('connect').hidden=false; $('find-lyrics').hidden=true; $('disconnect').hidden=true; }
     else if(e.message==='spotify_access_denied') say('Spotify denied playback access. Check the app permissions in Spotify Developer Dashboard.');
     else say('Could not read playback: '+e.message);
   }
 }
-function startPolling(){ stopPolling(); poller=setInterval(playback,5000); }
+async function findLyrics(){
+  $('find-lyrics').disabled=true;
+  $('find-lyrics').textContent='Looking…';
+  $('lyrics-panel').hidden=false;
+  $('lyrics-meta').textContent='Looking up this track in LRCLIB…';
+  $('lyrics').replaceChildren();
+  try{
+    const data=await api('/api/lyrics');
+    renderLyrics(data);
+  }catch(e){
+    $('lyrics-panel').hidden=false;
+    $('lyrics-meta').textContent=e.message==='lyrics_not_found'
+      ? 'No lyrics match found for this exact recording yet. Try another version of the track, or we can add manual search next.'
+      : e.message==='nothing_playing'
+        ? 'Start playing a track in Spotify first, then try again.'
+        : e.message==='lyrics_rate_limited'
+          ? 'The lyrics service is rate-limiting requests. Wait a little and try again.'
+          : 'Could not fetch lyrics: '+e.message;
+  }finally{
+    $('find-lyrics').disabled=false;
+    $('find-lyrics').textContent='Find lyrics';
+  }
+}
+function startPolling(){ stopPolling(); poller=setInterval(()=>{playback();updateActiveLyric();},5000); }
 function stopPolling(){ if(poller) clearInterval(poller); poller=null; }
 $('connect').onclick=()=>location.href='/auth/login';
 $('check').onclick=playback;
-$('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();$('connection').textContent='not connected';$('connect').hidden=false;$('disconnect').hidden=true;say('Disconnected from Spotify.')}catch(e){say('Could not disconnect: '+e.message)}};
+$('find-lyrics').onclick=findLyrics;
+$('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('Disconnected from Spotify.')}catch(e){say('Could not disconnect: '+e.message)}};
 const queryError=new URLSearchParams(location.search).get('spotify_error');
 if(queryError) say('Spotify connection error: '+queryError.replaceAll('_',' ')+'. Check the app settings and try again.');
 connection();
