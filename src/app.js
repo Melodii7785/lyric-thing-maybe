@@ -4,6 +4,8 @@ import '@applemusic-like-lyrics/core/style.css';
 
 const $ = id => document.getElementById(id);
 let poller = null;
+let currentTrackId = null;
+let lyricRequestId = 0;
 let lyricLines = [];
 let lyricsAreSynced = false;
 let amllPlayer = new LyricPlayer();
@@ -196,7 +198,19 @@ async function connection(){
 async function playback(){
   try {
     const data = await api('/api/spotify/playback');
-    if (!data.track) { clearTrack(); say('Spotify is connected, but nothing is currently playing. Start a track in Spotify and check again.'); return; }
+    if (!data.track) {
+      if (currentTrackId !== null) {
+        currentTrackId = null;
+        lyricRequestId++;
+        clearLyrics();
+      }
+      clearTrack();
+      say('Spotify is connected, but nothing is currently playing. Start a track in Spotify and check again.');
+      return;
+    }
+    const nextTrackId = data.track.id || `${data.track.title}::${(data.track.artists || []).join(', ')}`;
+    const trackChanged = nextTrackId !== currentTrackId;
+    currentTrackId = nextTrackId;
     $('track').hidden=false;
     $('title').textContent=data.track.title;
     $('artist').textContent=(data.track.artists||[]).join(', ') || 'Unknown artist';
@@ -210,7 +224,14 @@ async function playback(){
       amllPlayer.setCurrentTime(Math.round(latestProgressMs),true);
       if(isPlaying) amllPlayer.resume(); else amllPlayer.pause();
     }
-    updateActiveLyric();
+    if (trackChanged) {
+      clearLyrics();
+      $('lyrics-panel').hidden = false;
+      $('lyrics-meta').textContent = 'New track detected. Loading lyrics…';
+      void findLyrics({ automatic: true, trackId: nextTrackId });
+    } else {
+      updateActiveLyric();
+    }
     say('Playback detected successfully.');
   } catch(e) {
     clearTrack();
@@ -219,28 +240,37 @@ async function playback(){
     else say('Could not read playback: '+e.message);
   }
 }
-async function findLyrics(){
-  $('find-lyrics').disabled=true;
-  $('find-lyrics').textContent='Looking…';
-  $('lyrics-panel').hidden=false;
-  $('lyrics-meta').textContent='Asking Spicy Lyrics for the best available sync…';
-  if(amllPlayer) amllPlayer.setLyricLines([]);
-  try{
-    const data=await api('/api/lyrics');
-    if(data.spicyLyrics) renderSpicyLyrics(data);
+async function findLyrics({ automatic = false, trackId = currentTrackId } = {}){
+  const requestId = ++lyricRequestId;
+  if (!automatic) {
+    $('find-lyrics').disabled = true;
+    $('find-lyrics').textContent = 'Looking…';
+  }
+  $('lyrics-panel').hidden = false;
+  $('lyrics-meta').textContent = automatic
+    ? 'New track detected. Asking Spicy Lyrics for the best available sync…'
+    : 'Asking Spicy Lyrics for the best available sync…';
+  if (amllPlayer) amllPlayer.setLyricLines([]);
+  try {
+    const data = await api('/api/lyrics');
+    if (requestId !== lyricRequestId || trackId !== currentTrackId) return;
+    if (data.spicyLyrics) renderSpicyLyrics(data);
     else renderLyrics(data);
-  }catch(e){
-    $('lyrics-panel').hidden=false;
-    $('lyrics-meta').textContent=e.message==='lyrics_not_found'
-      ? 'lrc.red could not match this recording from its title/artist metadata, or it has no TTML lyrics for it yet.'
-      : e.message==='nothing_playing'
+  } catch (e) {
+    if (requestId !== lyricRequestId || trackId !== currentTrackId) return;
+    $('lyrics-panel').hidden = false;
+    $('lyrics-meta').textContent = e.message === 'lyrics_not_found'
+      ? 'No synced lyrics found for this track yet.'
+      : e.message === 'nothing_playing'
         ? 'Start playing a track in Spotify first, then try again.'
-        : e.message==='lyrics_provider_failed'
-          ? 'lrc.red could not return lyrics right now. Try again in a moment.'
-          : 'Could not fetch lyrics: '+e.message;
-  }finally{
-    $('find-lyrics').disabled=false;
-    $('find-lyrics').textContent='Find lyrics';
+        : e.message === 'lyrics_provider_failed'
+          ? 'The lyrics provider could not return lyrics right now. Try again in a moment.'
+          : 'Could not fetch lyrics: ' + e.message;
+  } finally {
+    if (requestId === lyricRequestId) {
+      $('find-lyrics').disabled = false;
+      $('find-lyrics').textContent = 'Find lyrics';
+    }
   }
 }
 function startPolling(){
@@ -253,7 +283,7 @@ function stopPolling(){
 }
 $('connect').onclick=()=>location.href='/auth/login';
 $('check').onclick=playback;
-$('find-lyrics').onclick=findLyrics;
+$('find-lyrics').onclick=()=>findLyrics();
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('Disconnected from Spotify.')}catch(e){say('Could not disconnect: '+e.message)}};
 function animateAMLL(frameTime){
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
