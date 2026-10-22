@@ -18,7 +18,7 @@
   "kv_namespaces": [
     {
       "binding": "OAUTH_STATE",
-      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+      "id": "b8c6394225c84c4ab1b65cc9032934bb"
     }
   ],
   "vars": {
