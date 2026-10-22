@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "lyric-thing-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+      "database_id": "4e35a3db-4ce4-4683-a53a-dd144222665e"
     }
   ],
   "kv_namespaces": [
