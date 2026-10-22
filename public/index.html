@@ -8,16 +8,245 @@
 <title>lyric thing™</title>
 <link rel="stylesheet" href="/amll.css">
 <style>
-:root{color-scheme:dark;font-family:"SF Pro Display","SF Pro Text",-apple-system,BlinkMacSystemFont,"Inter Variable",Inter,ui-sans-serif,system-ui,"Segoe UI",sans-serif;background:#100f14;color:#f8f5fb}
-*{box-sizing:border-box}body{max-width:900px;margin:0 auto;padding:clamp(18px,4vw,44px);background:radial-gradient(ellipse at 10% 0%,#302039 0,transparent 42%),#100f14;min-height:100vh}
-.eyebrow{color:#ff9bcf;font-size:.76rem;font-weight:800;letter-spacing:.17em;text-transform:uppercase}
-h1{font-size:clamp(3.2rem,11vw,6.5rem);line-height:.88;letter-spacing:-.085em;margin:16px 0 18px}
-p{color:#c7bdcf;line-height:1.6}.panel{background:rgba(29,25,35,.92);border:1px solid #443448;border-radius:28px;padding:clamp(18px,4vw,30px);margin-top:28px;box-shadow:0 24px 70px #0005}
-.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}button{border:0;border-radius:999px;padding:12px 18px;font:inherit;font-weight:750;cursor:pointer;background:#ff9bcf;color:#241321;transition:transform .15s,filter .15s}button:hover{filter:brightness(1.08);transform:translateY(-1px)}button.secondary{background:#352d3d;color:#f8f5fb;border:1px solid #51445a}button:disabled{opacity:.5;cursor:wait;transform:none}
-#status{font-size:.9rem;color:#d9cfdf;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:18px}.track{display:flex;gap:18px;align-items:center;margin-top:24px;padding:16px;border-radius:20px;background:#ffffff08}.track>div{min-width:0}#cover{width:104px;height:104px;object-fit:cover;border-radius:16px;background:#39303f;display:none;box-shadow:0 8px 25px #0005}.track h2{font-size:1.35rem;margin:0 0 6px;overflow-wrap:anywhere}.track p{margin:0}.muted{font-size:.82rem;color:#a99aae}.pill{display:inline-block;border:1px solid #66516c;border-radius:99px;padding:6px 11px;font-size:.76rem;color:#f0d9eb}
-#lyrics-panel{margin-top:28px;border-top:1px solid #403447;padding-top:22px}#lyrics-panel h2{font-size:1.55rem;letter-spacing:-.04em;margin:0}#lyrics{height:clamp(320px,58vh,680px);max-height:68vh;overflow:hidden;margin-top:20px;position:relative;overscroll-behavior:contain;--amll-lp-color:#fff;--amll-lp-bg-color:transparent}#lyrics .amll-lyric-player{height:100%;width:100%;background:transparent;font-family:"SF Pro Display","SF Pro Text",-apple-system,BlinkMacSystemFont,"Inter Variable",Inter,ui-sans-serif,system-ui,sans-serif!important;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}#lyrics .amll-lyric-player *{font-family:inherit!important}#lyrics-meta{font-size:.8rem;color:#b3a5bb}
-#lyrics-attribution{margin-top:20px;padding-top:14px;border-top:1px solid #39303f;font-size:.78rem;line-height:1.7}a{color:#ff9bcf}button:focus-visible,a:focus-visible{outline:2px solid #ff9bcf;outline-offset:3px}
-@media(max-width:480px){.track{gap:13px;padding:12px}#cover{width:82px;height:82px}.panel{border-radius:22px}.actions button{flex:1 1 auto}}
+:root {
+  color-scheme: dark;
+  font-family:
+    "SF Pro Display",
+    "SF Pro Text",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Inter Variable",
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    "Segoe UI",
+    sans-serif;
+  background: #100f14;
+  color: #f8f5fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  max-width: 900px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: clamp(18px, 4vw, 44px);
+  background:
+    radial-gradient(ellipse at 10% 0%, #302039 0, transparent 42%),
+    #100f14;
+}
+
+.eyebrow {
+  color: #ff9bcf;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 16px 0 18px;
+  font-size: clamp(3.2rem, 11vw, 6.5rem);
+  line-height: 0.88;
+  letter-spacing: -0.085em;
+}
+
+p {
+  color: #c7bdcf;
+  line-height: 1.6;
+}
+
+.panel {
+  margin-top: 28px;
+  padding: clamp(18px, 4vw, 30px);
+  background: rgba(29, 25, 35, 0.92);
+  border: 1px solid #443448;
+  border-radius: 28px;
+  box-shadow: 0 24px 70px #0005;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+button {
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #ff9bcf;
+  color: #241321;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+  transition: transform 0.15s, filter 0.15s;
+}
+
+button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+button.secondary {
+  background: #352d3d;
+  color: #f8f5fb;
+  border: 1px solid #51445a;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+  transform: none;
+}
+
+#status {
+  margin-top: 18px;
+  color: #d9cfdf;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.track {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 20px;
+  background: #ffffff08;
+}
+
+.track > div {
+  min-width: 0;
+}
+
+#cover {
+  display: none;
+  width: 104px;
+  height: 104px;
+  object-fit: cover;
+  border-radius: 16px;
+  background: #39303f;
+  box-shadow: 0 8px 25px #0005;
+}
+
+.track h2 {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  overflow-wrap: anywhere;
+}
+
+.track p {
+  margin: 0;
+}
+
+.muted {
+  color: #a99aae;
+  font-size: 0.82rem;
+}
+
+.pill {
+  display: inline-block;
+  padding: 6px 11px;
+  border: 1px solid #66516c;
+  border-radius: 99px;
+  color: #f0d9eb;
+  font-size: 0.76rem;
+}
+
+#lyrics-panel {
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid #403447;
+}
+
+#lyrics-panel h2 {
+  margin: 0;
+  font-size: 1.55rem;
+  letter-spacing: -0.04em;
+}
+
+#lyrics {
+  position: relative;
+  height: clamp(320px, 58vh, 680px);
+  max-height: 68vh;
+  margin-top: 20px;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  --amll-lp-color: #fff;
+  --amll-lp-bg-color: transparent;
+}
+
+#lyrics .amll-lyric-player {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  font-family:
+    "SF Pro Display",
+    "SF Pro Text",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Inter Variable",
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#lyrics .amll-lyric-player * {
+  font-family: inherit !important;
+}
+
+#lyrics-meta {
+  color: #b3a5bb;
+  font-size: 0.8rem;
+}
+
+#lyrics-attribution {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid #39303f;
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+
+a {
+  color: #ff9bcf;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #ff9bcf;
+  outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .track {
+    gap: 13px;
+    padding: 12px;
+  }
+
+  #cover {
+    width: 82px;
+    height: 82px;
+  }
+
+  .panel {
+    border-radius: 22px;
+  }
+
+  .actions button {
+    flex: 1 1 auto;
+  }
+}
 </style>
 </head>
 <body>
