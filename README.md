@@ -11,12 +11,12 @@ A browser-based lyrics finder prototype.
 
 ## Status
 
-This repository is a work in progress. The standalone frontend and Cloudflare Worker starter were prepared separately; the live Spotify OAuth/playback flow has not been tested in production.
+This repository is a work in progress. The Cloudflare Workers Builds pipeline is configured for the `main` branch. Production builds run `npm run typecheck` before deploying with Wrangler. The live Spotify OAuth/playback flow still needs to be tested after deployment.
 
 ## Security
 
 Never commit Spotify client secrets, token-encryption keys, access tokens, or refresh tokens. Keep secrets in Cloudflare Worker secrets, never browser code or this repository.
 
-## Planned deployment
+## Deployment
 
-Cloudflare Workers with static assets, D1, and KV. Before public launch, configure bindings and secrets, test OAuth and playback, add privacy/consent handling, and review Spotify's current developer policies.
+The Worker uses Cloudflare static assets, D1, and KV. Before public launch, test OAuth and playback, add privacy/consent handling, and review Spotify's current developer policies.
