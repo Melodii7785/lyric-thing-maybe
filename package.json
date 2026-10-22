@@ -21,7 +21,7 @@
     "@pixi/core": "^7.4.3",
     "@pixi/display": "^7.4.3",
     "@pixi/filter-blur": "^7.4.3",
-    "@pixi/filter-bulge-pinch": "^7.4.3",
+    "@pixi/filter-bulge-pinch": "^5.1.1",
     "@pixi/filter-color-matrix": "^7.4.3",
     "@pixi/sprite": "^7.4.3",
     "jss": "^10.10.0",
