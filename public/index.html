@@ -1,34 +1,85 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>lyric thing™</title>
-  <style>
-    :root{color-scheme:dark;font-family:system-ui,sans-serif;background:#18151d;color:#f7edf4}
-    body{max-width:720px;margin:12vh auto;padding:24px}
-    h1{font-size:clamp(2.5rem,9vw,5rem);margin:0}
-    p{color:#cbbdce;line-height:1.6}
-    button{border:0;border-radius:12px;padding:12px 16px;margin:6px 6px 6px 0;font:inherit;font-weight:700;cursor:pointer;background:#f49ac2;color:#251421}
-    pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#27212d;padding:14px;border-radius:12px}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#18151d">
+<title>lyric thing™</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#18151d;color:#f7edf4}
+*{box-sizing:border-box}body{max-width:760px;margin:0 auto;padding:clamp(20px,5vw,48px)}
+.eyebrow{color:#f49ac2;font-size:.8rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+h1{font-size:clamp(3rem,12vw,6rem);line-height:.95;letter-spacing:-.07em;margin:14px 0}
+p{color:#cbbdce;line-height:1.65}.panel{background:#27212d;border:1px solid #403447;border-radius:22px;padding:22px;margin-top:26px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}button{border:0;border-radius:12px;padding:12px 16px;font:inherit;font-weight:750;cursor:pointer;background:#f49ac2;color:#251421}button.secondary{background:#39303f;color:#f7edf4}button:disabled{opacity:.5;cursor:wait}
+#status{font-size:.92rem;color:#d8c9db;white-space:pre-wrap;overflow-wrap:anywhere}.track{display:flex;gap:18px;align-items:center;margin-top:20px}#cover{width:112px;height:112px;object-fit:cover;border-radius:14px;background:#39303f;display:none}.track h2{font-size:1.35rem;margin:0 0 6px}.track p{margin:0}.muted{font-size:.85rem;color:#a99aae}.pill{display:inline-block;border:1px solid #66516c;border-radius:99px;padding:5px 10px;font-size:.78rem;color:#eacfe0}
+</style>
 </head>
 <body>
-  <h1>lyric thing™</h1>
-  <p>find the words. hopefully.</p>
-  <button id="connect">Connect Spotify</button>
-  <button id="session">Check connection</button>
-  <pre id="status">Not checked yet.</pre>
-  <script>
-    const status = document.querySelector('#status');
-    document.querySelector('#connect').onclick = () => location.href = '/auth/login';
-    document.querySelector('#session').onclick = async () => {
-      status.textContent = 'Checking…';
-      try {
-        const r = await fetch('/api/session', { credentials: 'same-origin' });
-        status.textContent = JSON.stringify(await r.json(), null, 2);
-      } catch (e) { status.textContent = String(e); }
-    };
-  </script>
+<div class="eyebrow">a tiny music experiment</div>
+<h1>lyric thing™</h1>
+<p>find the words. hopefully. first, let's see what Spotify is playing.</p>
+<section class="panel">
+  <span class="pill" id="connection">not connected</span>
+  <div class="actions">
+    <button id="connect">Connect Spotify</button>
+    <button class="secondary" id="check">Check playback</button>
+    <button class="secondary" id="disconnect">Disconnect</button>
+  </div>
+  <div id="status" role="status" aria-live="polite">Checking connection…</div>
+  <div class="track" id="track" hidden>
+    <img id="cover" alt="Album cover">
+    <div><h2 id="title">Nothing playing</h2><p id="artist"></p><p class="muted" id="album"></p><p class="muted" id="playstate"></p></div>
+  </div>
+</section>
+<p class="muted">This is the connection test screen. The lyric search interface will be wired in after Spotify playback is confirmed.</p>
+<script>
+const $ = id => document.getElementById(id);
+let poller = null;
+function say(message){ $('status').textContent = message; }
+async function api(path, options={}) {
+  const response = await fetch(path, { credentials:'same-origin', cache:'no-store', ...options });
+  const data = response.status === 204 ? {} : await response.json().catch(()=>({}));
+  if (!response.ok) throw new Error(data.error || 'Request failed ('+response.status+')');
+  return data;
+}
+function clearTrack(){ $('track').hidden=true; $('cover').style.display='none'; }
+async function connection(){
+  try {
+    const data = await api('/api/session');
+    $('connection').textContent = data.connected ? 'Spotify connected' : 'not connected';
+    $('connect').hidden = data.connected;
+    $('disconnect').hidden = !data.connected;
+    if (!data.connected) { clearTrack(); say('Connect Spotify to detect the track currently playing.'); stopPolling(); }
+    else { say('Connected'+(data.user?.displayName ? ' as '+data.user.displayName : '')+'. Checking playback…'); await playback(); startPolling(); }
+  } catch(e){ say('Could not check connection: '+e.message+'\nThe Worker may not be configured yet.'); }
+}
+async function playback(){
+  try {
+    const data = await api('/api/spotify/playback');
+    if (!data.track) { clearTrack(); say('Spotify is connected, but nothing is currently playing. Start a track in Spotify and check again.'); return; }
+    $('track').hidden=false;
+    $('title').textContent=data.track.title;
+    $('artist').textContent=(data.track.artists||[]).join(', ') || 'Unknown artist';
+    $('album').textContent=data.track.album || '';
+    $('playstate').textContent=data.playing ? '▶ Playing' : 'Ⅱ Paused';
+    if(data.track.image){ $('cover').src=data.track.image; $('cover').style.display='block'; } else $('cover').style.display='none';
+    say('Playback detected successfully.');
+  } catch(e) {
+    clearTrack();
+    if(e.message==='not_connected'||e.message==='spotify_reconnect_required'){ say('Spotify needs to be connected again.'); stopPolling(); $('connection').textContent='not connected'; $('connect').hidden=false; $('disconnect').hidden=true; }
+    else if(e.message==='spotify_access_denied') say('Spotify denied playback access. Check the app permissions in Spotify Developer Dashboard.');
+    else say('Could not read playback: '+e.message);
+  }
+}
+function startPolling(){ stopPolling(); poller=setInterval(playback,5000); }
+function stopPolling(){ if(poller) clearInterval(poller); poller=null; }
+$('connect').onclick=()=>location.href='/auth/login';
+$('check').onclick=playback;
+$('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();$('connection').textContent='not connected';$('connect').hidden=false;$('disconnect').hidden=true;say('Disconnected from Spotify.')}catch(e){say('Could not disconnect: '+e.message)}};
+const queryError=new URLSearchParams(location.search).get('spotify_error');
+if(queryError) say('Spotify connection error: '+queryError.replaceAll('_',' ')+'. Check the app settings and try again.');
+connection();
+</script>
 </body>
 </html>
