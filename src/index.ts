@@ -215,35 +215,22 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const playback = await playbackResponse.json() as any;
     const track = playback?.item;
     if (!track) return json({ error: "nothing_playing" }, 404);
-
+    const isrc = track.external_ids?.isrc;
     const artists = Array.isArray(track.artists) ? track.artists.map((artist: any) => artist.name).filter(Boolean) : [];
-    const params = new URLSearchParams({
-      track_name: track.name || "",
-      artist_name: artists.join(", "),
-    });
-    if (track.album?.name) params.set("album_name", track.album.name);
-    if (typeof track.duration_ms === "number" && track.duration_ms > 0) params.set("duration", String(Math.round(track.duration_ms / 1000)));
+    if (!isrc) return json({ error: "track_isrc_unavailable", track: { title: track.name, artists } }, 422);
 
-    const lyricsResponse = await fetch("https://lrclib.net/api/get?" + params.toString(), {
-      headers: { "User-Agent": "lyric-thing/0.1.0 (https://github.com/Melodii7785/lyric-thing-maybe)", accept: "application/json" },
+    const lyricsResponse = await fetch("https://lrc.red/s/" + encodeURIComponent(isrc) + ".ttml", {
+      headers: { accept: "application/ttml+xml, application/xml, text/xml, */*" },
     });
     if (lyricsResponse.status === 404) return json({
-      error: "lyrics_not_found",
-      track: { title: track.name, artists, album: track.album?.name ?? null },
+      error: "lyrics_not_found", track: { title: track.name, artists, album: track.album?.name ?? null },
     }, 404);
-    if (lyricsResponse.status === 429) return json({ error: "lyrics_rate_limited", retryAfter: lyricsResponse.headers.get("Retry-After") }, 429);
     if (!lyricsResponse.ok) return json({ error: "lyrics_provider_failed", status: lyricsResponse.status }, 502);
-
-    const lyrics = await lyricsResponse.json() as any;
+    const ttml = await lyricsResponse.text();
+    if (!ttml.trim() || !ttml.includes("<")) return json({ error: "lyrics_not_found" }, 404);
     return json({
-      track: { title: lyrics.trackName || track.name, artists: [lyrics.artistName || artists.join(", ")], album: lyrics.albumName || track.album?.name || null },
-      instrumental: !!lyrics.instrumental,
-      hasWordSync: !!lyrics.hasWordSync,
-      plainLyrics: lyrics.plainLyrics ?? null,
-      syncedLyrics: lyrics.syncedLyrics ?? null,
-      lyricsfile: lyrics.hasWordSync ? (lyrics.lyricsfile ?? null) : null,
-      provider: "LRCLIB",
-      providerUrl: "https://lrclib.net",
+      track: { title: track.name, artists, album: track.album?.name ?? null },
+      ttml, provider: "lrc.red", providerUrl: "https://lrc.red/",
     });
   }
   if (path === "/auth/logout" && request.method === "POST") {
