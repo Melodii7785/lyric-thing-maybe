@@ -9,12 +9,18 @@
 <link rel="stylesheet" href="/amll.css">
 <style>
 @font-face {
-  font-family: "Roboto Flex";
-  src: url("https://cdn.jsdelivr.net/fontsource/fonts/roboto-flex:vf@5.0.8/latin-wght-normal.woff2")
-    format("woff2");
-  font-weight: 100 1000;
+  font-family: "SF Pro Text";
   font-style: normal;
-  font-display: swap;
+  font-weight: 700;
+  src: url("https://raw.githubusercontent.com/blaisck/sfwin/master/SFPro/TrueType/SFProText-Bold.ttf");
+  format: ("ttf")
+}
+@font-face {
+  font-family: "SF Pro Display";
+  font-style: normal;
+  font-weight: 700;
+  src: url("https://raw.githubusercontent.com/blaisck/sfwin/master/SFPro/TrueType/SFProDisplay-Bold.ttf");
+  format: ("ttf")
 }
 
 :root {
@@ -24,7 +30,8 @@
     "SF Pro Text",
     -apple-system,
     BlinkMacSystemFont,
-    "Roboto Flex",
+    "SF Pro Display",
+    "SF Pro Text",
     "Inter Variable",
     Inter,
     ui-sans-serif,
