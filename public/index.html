@@ -183,14 +183,12 @@ async function findLyrics(){
   }catch(e){
     $('lyrics-panel').hidden=false;
     $('lyrics-meta').textContent=e.message==='lyrics_not_found'
-      ? 'lrc.red has no TTML lyrics for this recording yet. We can add a title/artist search fallback next.'
+      ? 'lrc.red could not match this recording from its title/artist metadata, or it has no TTML lyrics for it yet.'
       : e.message==='nothing_playing'
         ? 'Start playing a track in Spotify first, then try again.'
-        : e.message==='track_isrc_unavailable'
-          ? 'Spotify did not provide an ISRC for this track, so lrc.red cannot identify this recording automatically.'
-          : e.message==='lyrics_provider_failed'
-            ? 'lrc.red could not return lyrics right now. Try again in a moment.'
-            : 'Could not fetch lyrics: '+e.message;
+        : e.message==='lyrics_provider_failed'
+          ? 'lrc.red could not return lyrics right now. Try again in a moment.'
+          : 'Could not fetch lyrics: '+e.message;
   }finally{
     $('find-lyrics').disabled=false;
     $('find-lyrics').textContent='Find lyrics';
