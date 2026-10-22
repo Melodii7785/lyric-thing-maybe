@@ -196,6 +196,56 @@ async function handle(request: Request, env: Env): Promise<Response> {
       durationMs: track.duration_ms ?? null, uri: track.uri ?? null,
     }});
   }
+  if (path === "/api/lyrics" && request.method === "GET") {
+    let session = await getSession(request, env);
+    if (!session) return json({ error: "not_connected" }, 401);
+    try { session = await refresh(session, env); }
+    catch {
+      await env.DB.prepare("DELETE FROM sessions WHERE session_hash = ?").bind(session.session_hash).run();
+      return json({ error: "spotify_reconnect_required" }, 401);
+    }
+
+    const playbackResponse = await fetch(API_URL + "/me/player/currently-playing", {
+      headers: { authorization: "Bearer " + await decrypt(env, session.access_token_enc), accept: "application/json" },
+    });
+    if (playbackResponse.status === 204 || playbackResponse.status === 202) return json({ error: "nothing_playing" }, 404);
+    if (playbackResponse.status === 401) return json({ error: "spotify_reconnect_required" }, 401);
+    if (!playbackResponse.ok) return json({ error: "spotify_request_failed", status: playbackResponse.status }, 502);
+
+    const playback = await playbackResponse.json() as any;
+    const track = playback?.item;
+    if (!track) return json({ error: "nothing_playing" }, 404);
+
+    const artists = Array.isArray(track.artists) ? track.artists.map((artist: any) => artist.name).filter(Boolean) : [];
+    const params = new URLSearchParams({
+      track_name: track.name || "",
+      artist_name: artists.join(", "),
+    });
+    if (track.album?.name) params.set("album_name", track.album.name);
+    if (typeof track.duration_ms === "number" && track.duration_ms > 0) params.set("duration", String(Math.round(track.duration_ms / 1000)));
+
+    const lyricsResponse = await fetch("https://lrclib.net/api/get?" + params.toString(), {
+      headers: { "User-Agent": "lyric-thing/0.1.0 (https://github.com/Melodii7785/lyric-thing-maybe)", accept: "application/json" },
+    });
+    if (lyricsResponse.status === 404) return json({
+      error: "lyrics_not_found",
+      track: { title: track.name, artists, album: track.album?.name ?? null },
+    }, 404);
+    if (lyricsResponse.status === 429) return json({ error: "lyrics_rate_limited", retryAfter: lyricsResponse.headers.get("Retry-After") }, 429);
+    if (!lyricsResponse.ok) return json({ error: "lyrics_provider_failed", status: lyricsResponse.status }, 502);
+
+    const lyrics = await lyricsResponse.json() as any;
+    return json({
+      track: { title: lyrics.trackName || track.name, artists: [lyrics.artistName || artists.join(", ")], album: lyrics.albumName || track.album?.name || null },
+      instrumental: !!lyrics.instrumental,
+      hasWordSync: !!lyrics.hasWordSync,
+      plainLyrics: lyrics.plainLyrics ?? null,
+      syncedLyrics: lyrics.syncedLyrics ?? null,
+      lyricsfile: lyrics.hasWordSync ? (lyrics.lyricsfile ?? null) : null,
+      provider: "LRCLIB",
+      providerUrl: "https://lrclib.net",
+    });
+  }
   if (path === "/auth/logout" && request.method === "POST") {
     const raw = cookie(request, "lt_session");
     if (raw) await env.DB.prepare("DELETE FROM sessions WHERE session_hash = ?").bind(await sha256(decodeURIComponent(raw))).run();
