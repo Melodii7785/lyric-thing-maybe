@@ -7,14 +7,16 @@
 <meta name="description" content="A tiny experimental companion for finding lyrics and detecting your currently playing Spotify track.">
 <title>lyric thing™</title>
 <style>
-:root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#18151d;color:#f7edf4}
-*{box-sizing:border-box}body{max-width:760px;margin:0 auto;padding:clamp(20px,5vw,48px)}
-.eyebrow{color:#f49ac2;font-size:.8rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
-h1{font-size:clamp(3rem,12vw,6rem);line-height:.95;letter-spacing:-.07em;margin:14px 0}
-p{color:#cbbdce;line-height:1.65}.panel{background:#27212d;border:1px solid #403447;border-radius:22px;padding:22px;margin-top:26px}
-.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}button{border:0;border-radius:12px;padding:12px 16px;font:inherit;font-weight:750;cursor:pointer;background:#f49ac2;color:#251421}button.secondary{background:#39303f;color:#f7edf4}button:disabled{opacity:.5;cursor:wait}
-#status{font-size:.92rem;color:#d8c9db;white-space:pre-wrap;overflow-wrap:anywhere}.track{display:flex;gap:18px;align-items:center;margin-top:20px}#cover{width:112px;height:112px;object-fit:cover;border-radius:14px;background:#39303f;display:none}.track h2{font-size:1.35rem;margin:0 0 6px}.track p{margin:0}.muted{font-size:.85rem;color:#a99aae}.pill{display:inline-block;border:1px solid #66516c;border-radius:99px;padding:5px 10px;font-size:.78rem;color:#eacfe0}
-#lyrics-panel{margin-top:24px;border-top:1px solid #403447;padding-top:18px}#lyrics{max-height:48vh;overflow:auto;display:flex;flex-direction:column;gap:10px;margin-top:14px;scroll-behavior:smooth}.lyric-line{padding:7px 10px;border-radius:9px;color:#a99aae;line-height:1.5;white-space:pre-wrap}.lyric-line.active{background:#443044;color:#fff;font-weight:800;transform:scale(1.01)}#lyrics-meta{font-size:.8rem;color:#a99aae}.word.active{color:#fff;background:#a13d75;border-radius:3px}.word{border-radius:3px}
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#100f14;color:#f8f5fb}
+*{box-sizing:border-box}body{max-width:900px;margin:0 auto;padding:clamp(18px,4vw,44px);background:radial-gradient(ellipse at 10% 0%,#302039 0,transparent 42%),#100f14;min-height:100vh}
+.eyebrow{color:#ff9bcf;font-size:.76rem;font-weight:800;letter-spacing:.17em;text-transform:uppercase}
+h1{font-size:clamp(3.2rem,11vw,6.5rem);line-height:.88;letter-spacing:-.085em;margin:16px 0 18px}
+p{color:#c7bdcf;line-height:1.6}.panel{background:rgba(29,25,35,.92);border:1px solid #443448;border-radius:28px;padding:clamp(18px,4vw,30px);margin-top:28px;box-shadow:0 24px 70px #0005}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}button{border:0;border-radius:999px;padding:12px 18px;font:inherit;font-weight:750;cursor:pointer;background:#ff9bcf;color:#241321;transition:transform .15s,filter .15s}button:hover{filter:brightness(1.08);transform:translateY(-1px)}button.secondary{background:#352d3d;color:#f8f5fb;border:1px solid #51445a}button:disabled{opacity:.5;cursor:wait;transform:none}
+#status{font-size:.9rem;color:#d9cfdf;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:18px}.track{display:flex;gap:18px;align-items:center;margin-top:24px;padding:16px;border-radius:20px;background:#ffffff08}.track>div{min-width:0}#cover{width:104px;height:104px;object-fit:cover;border-radius:16px;background:#39303f;display:none;box-shadow:0 8px 25px #0005}.track h2{font-size:1.35rem;margin:0 0 6px;overflow-wrap:anywhere}.track p{margin:0}.muted{font-size:.82rem;color:#a99aae}.pill{display:inline-block;border:1px solid #66516c;border-radius:99px;padding:6px 11px;font-size:.76rem;color:#f0d9eb}
+#lyrics-panel{margin-top:28px;border-top:1px solid #403447;padding-top:22px}#lyrics-panel h2{font-size:1.55rem;letter-spacing:-.04em;margin:0}#lyrics{max-height:58vh;overflow:auto;display:flex;flex-direction:column;gap:7px;margin-top:20px;scroll-behavior:smooth;padding:8px 4px 14px;overscroll-behavior:contain}.lyric-line{padding:12px 15px;border-radius:14px;color:#8f8499;font-size:clamp(1.05rem,3.4vw,1.55rem);line-height:1.6;font-weight:650;white-space:pre-wrap;overflow-wrap:anywhere;transition:background .22s,color .22s,opacity .22s;opacity:.72}.lyric-line.active{background:linear-gradient(110deg,#39233d,#28212f);color:#fff;opacity:1;box-shadow:inset 3px 0 #ff9bcf}.lyric-line.past{opacity:.5}#lyrics-meta{font-size:.8rem;color:#b3a5bb}.word{border-radius:5px;transition:color .08s,background .08s}.word.active{color:#fff;background:#b04483;box-shadow:0 0 15px #b0448330}
+#lyrics-attribution{margin-top:20px;padding-top:14px;border-top:1px solid #39303f;font-size:.78rem;line-height:1.7}a{color:#ff9bcf}button:focus-visible,a:focus-visible{outline:2px solid #ff9bcf;outline-offset:3px}
+@media(max-width:480px){.track{gap:13px;padding:12px}#cover{width:82px;height:82px}.panel{border-radius:22px}.actions button{flex:1 1 auto}}
 </style>
 </head>
 <body>
@@ -45,8 +47,10 @@ p{color:#cbbdce;line-height:1.65}.panel{background:#27212d;border:1px solid #403
 <script>
 const $ = id => document.getElementById(id);
 let poller = null;
+let lyricTicker = null;
 let lyricLines = [];
 let activeLyric = -1;
+let activeWordKey = "";
 let lyricsAreSynced = false;
 let latestProgressMs = 0;
 let progressObservedAt = Date.now();
@@ -59,7 +63,7 @@ async function api(path, options={}) {
   return data;
 }
 function clearTrack(){ $('track').hidden=true; $('cover').style.display='none'; }
-function clearLyrics(){ lyricLines=[]; activeLyric=-1; $('lyrics').replaceChildren(); $('lyrics-panel').hidden=true; $('lyrics-attribution').replaceChildren(); }
+function clearLyrics(){ lyricLines=[]; activeLyric=-1; activeWordKey=""; $('lyrics').replaceChildren(); $('lyrics-panel').hidden=true; $('lyrics-attribution').replaceChildren(); }
 function setAttribution(source, uploadAttribution){
   const target=$('lyrics-attribution');
   target.replaceChildren();
@@ -94,9 +98,10 @@ function renderSpicyLyrics(data){
     const syllables=Array.isArray(lead.Syllables)?lead.Syllables.map(s=>({
       text:typeof s.Text==='string'?s.Text:'',
       time:Number.isFinite(s.StartTime)?s.StartTime:null,
-      endTime:Number.isFinite(s.EndTime)?s.EndTime:null
+      endTime:Number.isFinite(s.EndTime)?s.EndTime:null,
+      isPartOfWord:s.IsPartOfWord===true
     })).filter(s=>s.text):[];
-    const text=syllables.length?syllables.map(s=>s.text).join(''):(lead.Text||lead.TransliteratedText||lead.TranslatedText||entry?.Text||'');
+    const text=syllables.length?syllables.map((s,i)=>s.text+(!s.isPartOfWord&&i<syllables.length-1?' ':'')).join(''):(lead.Text||lead.TransliteratedText||lead.TranslatedText||entry?.Text||'');
     const candidateTimes=[lead.StartTime,entry?.StartTime,syllables[0]?.time,body.StartTime];
     const time=candidateTimes.find(t=>typeof t==='number'&&Number.isFinite(t));
     return {time:time??0,text,words:syllables};
@@ -122,6 +127,7 @@ function renderSpicyLyrics(data){
         span.className='word'; span.textContent=word.text;
         span.dataset.wordIndex=String(wordIndex);
         el.appendChild(span);
+        if(!word.isPartOfWord && wordIndex<line.words.length-1) el.appendChild(document.createTextNode(' '));
       });
     }else el.textContent=line.text;
     fragment.appendChild(el);
@@ -183,26 +189,33 @@ function renderLyrics(data){
   updateActiveLyric();
 }
 function updateActiveLyric(){
-  if(!lyricLines.length) return;
+  if(!lyricLines.length || $('lyrics-panel').hidden) return;
   const progress=latestProgressMs/1000+(isPlaying?(Date.now()-progressObservedAt)/1000:0);
   let next=-1;
   for(let i=0;i<lyricLines.length;i++){ if(lyricLines[i].time<=progress) next=i; else break; }
   if(next!==activeLyric){
+    const previous=$('lyrics').querySelector('.lyric-line.active');
+    if(previous){ previous.classList.remove('active'); if(Number(previous.dataset.index)<next) previous.classList.add('past'); }
     activeLyric=next;
-    document.querySelectorAll('.lyric-line.active').forEach(el=>el.classList.remove('active'));
     if(next>=0){
       const active=$('lyrics').querySelector('[data-index="'+next+'"]');
-      if(active){ active.classList.add('active'); active.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+      if(active){ active.classList.add('active'); active.classList.remove('past'); active.scrollIntoView({block:'nearest',behavior:'smooth'}); }
     }
+    activeWordKey="";
   }
-  document.querySelectorAll('.word.active').forEach(el=>el.classList.remove('active'));
+  let wordIndex=-1;
   if(next>=0){
     const line=lyricLines[next];
-    let wordIndex=-1;
     for(let i=0;i<line.words.length;i++){
       if(line.words[i].time!==null && line.words[i].time<=progress) wordIndex=i;
     }
-    if(wordIndex>=0){
+  }
+  const wordKey=next>=0&&wordIndex>=0?next+":"+wordIndex:"";
+  if(wordKey!==activeWordKey){
+    const previousWord=$('lyrics').querySelector('.word.active');
+    if(previousWord) previousWord.classList.remove('active');
+    activeWordKey=wordKey;
+    if(wordKey){
       const word=$('lyrics').querySelector('[data-index="'+next+'"] [data-word-index="'+wordIndex+'"]');
       if(word) word.classList.add('active');
     }
@@ -265,8 +278,16 @@ async function findLyrics(){
     $('find-lyrics').textContent='Find lyrics';
   }
 }
-function startPolling(){ stopPolling(); poller=setInterval(()=>{playback();updateActiveLyric();},5000); }
-function stopPolling(){ if(poller) clearInterval(poller); poller=null; }
+function startPolling(){
+  stopPolling();
+  poller=setInterval(playback,5000);
+  lyricTicker=setInterval(updateActiveLyric,80);
+}
+function stopPolling(){
+  if(poller) clearInterval(poller);
+  if(lyricTicker) clearInterval(lyricTicker);
+  poller=null; lyricTicker=null;
+}
 $('connect').onclick=()=>location.href='/auth/login';
 $('check').onclick=playback;
 $('find-lyrics').onclick=findLyrics;
