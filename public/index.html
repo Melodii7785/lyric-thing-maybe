@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>lyric thing™</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,sans-serif;background:#18151d;color:#f7edf4}
+    body{max-width:720px;margin:12vh auto;padding:24px}
+    h1{font-size:clamp(2.5rem,9vw,5rem);margin:0}
+    p{color:#cbbdce;line-height:1.6}
+    button{border:0;border-radius:12px;padding:12px 16px;margin:6px 6px 6px 0;font:inherit;font-weight:700;cursor:pointer;background:#f49ac2;color:#251421}
+    pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#27212d;padding:14px;border-radius:12px}
+  </style>
+</head>
+<body>
+  <h1>lyric thing™</h1>
+  <p>find the words. hopefully.</p>
+  <button id="connect">Connect Spotify</button>
+  <button id="session">Check connection</button>
+  <pre id="status">Not checked yet.</pre>
+  <script>
+    const status = document.querySelector('#status');
+    document.querySelector('#connect').onclick = () => location.href = '/auth/login';
+    document.querySelector('#session').onclick = async () => {
+      status.textContent = 'Checking…';
+      try {
+        const r = await fetch('/api/session', { credentials: 'same-origin' });
+        status.textContent = JSON.stringify(await r.json(), null, 2);
+      } catch (e) { status.textContent = String(e); }
+    };
+  </script>
+</body>
+</html>
