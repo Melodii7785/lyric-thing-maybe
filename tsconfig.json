@@ -4,10 +4,8 @@
     "module": "ES2022",
     "moduleResolution": "Bundler",
     "lib": [
-      "ES2022"
-    ],
-    "types": [
-      "@cloudflare/workers-types"
+      "ES2022",
+      "WebWorker"
     ],
     "strict": true,
     "noEmit": true
