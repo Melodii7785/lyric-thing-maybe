@@ -85,8 +85,8 @@ function extractArtworkColors(imageUrl, requestId){
     image.src = imageUrl;
   });
 }
-async function setAmbientBackground(imageUrl){
-  if(!imageUrl) return;
+async function setAmbientBackground(imageUrl, force = false){
+  if(!imageUrl || (!force && imageUrl === ambientImageUrl)) return;
   ambientImageUrl = imageUrl;
   const requestId = ++ambientRequestId;
   const colors = await extractArtworkColors(imageUrl, requestId);
@@ -105,7 +105,7 @@ function setDynamicBackgroundEnabled(enabled){
   const button = $('dynamic-background-toggle');
   button.textContent = 'Dynamic background: ' + (enabled ? 'On' : 'Off');
   button.setAttribute('aria-pressed', String(enabled));
-  if(enabled && ambientImageUrl) void setAmbientBackground(ambientImageUrl);
+  if(enabled && ambientImageUrl) void setAmbientBackground(ambientImageUrl, true);
 }
 function say(message){ $('status').textContent = message; }
 async function api(path, options={}) {
