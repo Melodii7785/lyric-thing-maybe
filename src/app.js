@@ -156,6 +156,21 @@ function setDynamicBackgroundEnabled(enabled){
   const button = $('dynamic-background-toggle');
   button.textContent = 'Dynamic background: ' + (enabled ? 'On' : 'Off');
   button.setAttribute('aria-pressed', String(enabled));
+  const mobileButton = $('mobile-background-button');
+  if(mobileButton){
+    mobileButton.setAttribute('aria-pressed', String(enabled));
+    mobileButton.setAttribute('aria-label', (enabled ? 'Disable' : 'Enable') + ' dynamic background');
+    mobileButton.title = (enabled ? 'Disable' : 'Enable') + ' dynamic background';
+  }
+  const connectButton = $('mobile-connect');
+  if(connectButton){
+    const connected = !$('connect').hidden;
+    connectButton.setAttribute('aria-label', connected ? 'Connect Spotify' : 'Disconnect Spotify');
+    connectButton.title = connected ? 'Connect Spotify' : 'Disconnect Spotify';
+    connectButton.innerHTML = connected
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16.5a5.5 5.5 0 0 1 0-11h3"/><path d="M16 7.5a5.5 5.5 0 0 0-5.5-5.5"/><path d="M12 9v6m-3-3h6"/></svg>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16.5a5.5 5.5 0 0 1 0-11h3"/><path d="M16 7.5a5.5 5.5 0 0 0 0 11h-3"/><path d="m9 9 6 6m0-6-6 6"/></svg>';
+  }
   if(enabled && ambientImageUrl) void setAmbientBackground(ambientImageUrl, true);
 }
 function say(message){ $('status').textContent = message; }
@@ -344,6 +359,7 @@ async function connection(){
     $('connect').hidden = data.connected;
     $('find-lyrics').hidden = !data.connected;
     $('disconnect').hidden = !data.connected;
+    const mobileConnect=$('mobile-connect'); if(mobileConnect){ mobileConnect.setAttribute('aria-label',data.connected?'Disconnect Spotify':'Connect Spotify'); mobileConnect.title=data.connected?'Disconnect Spotify':'Connect Spotify'; mobileConnect.innerHTML=data.connected?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16.5a5.5 5.5 0 0 1 0-11h3"/><path d="M16 7.5a5.5 5.5 0 0 0-5.5-5.5"/><path d="m9 9 6 6m0-6-6 6"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16.5a5.5 5.5 0 0 1 0-11h3"/><path d="M16 7.5a5.5 5.5 0 0 0 0 11h-3"/><path d="M12 9v6m-3-3h6"/></svg>'; }
     if (!data.connected) { clearTrack(); clearLyrics(); say('Connect Spotify to detect the track currently playing.'); stopPolling(); }
     else { say('Connected'+(data.user?.displayName ? ' as '+data.user.displayName : '')+'. Checking playback…'); await playback(); startPolling(); }
   } catch(e){ say('Could not check connection: '+e.message+'\nThe Worker may not be configured yet.'); }
@@ -447,10 +463,12 @@ $('mobile-refresh').onclick=playback;
 $('mobile-reload').onclick=playback;
 $('mobile-lyrics').onclick=()=>findLyrics();
 $('mobile-lyrics-button').onclick=()=>findLyrics();
-$('mobile-connect').onclick=()=>location.href='/auth/login';
+$('mobile-connect').onclick=()=>{ if($('connect').hidden) $('disconnect').click(); else location.href='/auth/login'; };
 $('mobile-disconnect').onclick=()=>$('disconnect').click();
 $('mobile-background').onclick=()=>$('dynamic-background-toggle').click();
 $('mobile-background-button').onclick=()=>$('dynamic-background-toggle').click();
+$('mobile-background-button').setAttribute('aria-pressed', String(dynamicBackgroundEnabled));
+$('mobile-lyrics-button').onclick=()=>{ if(currentTrackId) findLyrics(); else playback(); };
 $('mobile-more').onclick=()=> $('mobile-more-menu').classList.toggle('open');
 $('mobile-fullscreen').onclick=async()=>{
   try {
