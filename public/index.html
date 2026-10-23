@@ -543,6 +543,28 @@ a:focus-visible {
   .mobile-dock .transport { gap:6px; }
 }
 
+/* Minimal, screenshot-led mobile layout */
+@media(max-width:600px){
+body{padding:calc(env(safe-area-inset-top) + 8px) 20px calc(112px + env(safe-area-inset-bottom));overflow-x:hidden}
+body>.eyebrow,body>h1,body>p{display:none!important}
+.panel{margin:0;padding:0;background:transparent;border:0;border-radius:0;box-shadow:none}
+#connection,#status{display:none!important}
+.track{position:fixed;z-index:30;top:0;left:0;right:0;margin:0;padding:calc(env(safe-area-inset-top) + 14px) 20px 12px;gap:14px;background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border:0;border-radius:0}
+#cover{width:64px;height:64px;flex:0 0 64px;object-fit:cover;border-radius:2px;box-shadow:0 4px 18px #0003}
+.track>div{min-width:0;flex:1}.track h2{font-size:1.2rem;line-height:1.12;margin:0 0 4px;letter-spacing:-.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.track #artist{font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#album,#playstate{display:none}
+#lyrics-panel{display:flex;flex-direction:column;margin:0;padding:0;border:0}#lyrics-panel h2{display:none}
+#lyrics-meta{position:fixed;top:calc(env(safe-area-inset-top) + 88px);left:20px;right:20px;margin:0;font-size:.7rem;opacity:.6}
+#lyrics{position:fixed;top:calc(env(safe-area-inset-top) + 96px);bottom:calc(160px + env(safe-area-inset-bottom));left:20px;right:20px;width:auto;height:auto;min-height:0;max-height:none;margin:0;overflow:hidden;mask-image:linear-gradient(180deg,transparent 0%,#000 9%,#000 84%,transparent 100%);-webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 9%,#000 84%,transparent 100%)}
+#lyrics .amll-lyric-player{background:transparent}#lyrics-attribution{display:none}
+.mobile-progress:not([hidden]){display:block;position:fixed;z-index:35;left:22px;right:22px;bottom:calc(100px + env(safe-area-inset-bottom));padding:0;border:0}
+.progress-track{height:4px;border-radius:8px;overflow:hidden;background:#ffffff35}#progress-fill{height:100%;background:#fff;border-radius:8px}.progress-times{display:flex;justify-content:space-between;margin-top:8px;font-size:.78rem;color:#ffffffd0;font-variant-numeric:tabular-nums}
+.mobile-dock{position:fixed;z-index:50;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:center;gap:15px;width:max-content;max-width:calc(100vw - 28px);padding:10px 14px;border:1px solid #ffffff3b;border-radius:999px;background:#ffffff18;box-shadow:0 8px 32px #0002,inset 0 1px #ffffff20;backdrop-filter:blur(24px) saturate(1.35);-webkit-backdrop-filter:blur(24px) saturate(1.35)}
+.mobile-dock button{display:flex;align-items:center;justify-content:center;width:48px;height:48px;flex:0 0 48px;padding:0;border:1px solid #ffffff40;border-radius:50%;color:#fff;background:#ffffff12;box-shadow:inset 0 1px #ffffff20;cursor:pointer;transition:transform .16s,background .16s}
+.mobile-dock button:active{transform:scale(.92);background:#ffffff30}.mobile-dock button:disabled{opacity:.42;cursor:default}.mobile-dock svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.mobile-dock button[aria-pressed="true"]{background:#ffffff32;border-color:#ffffff75}
+.actions{display:none!important}#dynamic-background{inset:-14%}.ambient-shade{background:linear-gradient(180deg,#07152112 0%,#07152105 42%,#07152138 74%,#0715218a 100%)}
+}
+@media(max-width:380px){.mobile-dock{gap:9px;padding:8px 10px}.mobile-dock button{width:44px;height:44px;flex-basis:44px}}
+
 </style>
 </head>
 <body>
@@ -575,30 +597,11 @@ a:focus-visible {
     <p class="muted" id="lyrics-attribution">Lyrics provider attribution will appear here.</p>
   </div>
 </section>
-<nav class="mobile-dock" aria-label="Mobile player controls">
-  <div class="more-menu" id="mobile-more-menu">
-    <button id="mobile-connect">Connect Spotify</button>
-    <button id="mobile-refresh">Refresh playback</button>
-    <button id="mobile-lyrics">Reload lyrics</button>
-    <button id="mobile-background">Background: On</button>
-    <button id="mobile-disconnect">Disconnect</button>
-  </div>
-  <div class="transport">
-    <button id="mobile-shuffle" aria-label="Shuffle (Spotify controls unavailable)" title="Spotify playback controls are not available here">⤨</button>
-    <button id="mobile-previous" aria-label="Previous track (Spotify controls unavailable)" title="Spotify playback controls are not available here">|◀</button>
-    <button class="main-action" id="mobile-play" aria-label="Playback status" title="Playback is controlled in Spotify">Ⅱ</button>
-    <button id="mobile-next" aria-label="Next track (Spotify controls unavailable)" title="Spotify playback controls are not available here">▶|</button>
-    <button id="mobile-repeat" aria-label="Repeat (Spotify controls unavailable)" title="Spotify playback controls are not available here">↻</button>
-  </div>
-  <div class="utilities">
-    <button id="mobile-translate" aria-label="Translation unavailable" title="Translation isn't implemented yet">文</button>
-    <button id="mobile-reload" aria-label="Refresh playback" title="Refresh playback">↻</button>
-    <button id="mobile-fullscreen" aria-label="Toggle fullscreen" title="Toggle fullscreen">⛶</button>
-    <button id="mobile-lyrics-button" aria-label="Reload lyrics" title="Reload lyrics">☷</button>
-    <button id="mobile-background-button" aria-label="Toggle dynamic background" title="Toggle dynamic background">☼</button>
-    <button id="mobile-settings" aria-label="Player options" title="Player options">☷</button>
-    <button id="mobile-more" aria-label="More options" title="More options">•••</button>
-  </div>
+<nav class="mobile-dock" aria-label="Player tools">
+<button id="mobile-refresh" aria-label="Check playback" title="Check playback"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M4.8 9A7.5 7.5 0 0 1 18 6.5L20 12M4 17v-5h5"/><path d="M19.2 15A7.5 7.5 0 0 1 6 17.5L4 12"/></svg></button>
+<button id="mobile-connect" aria-label="Connect Spotify" title="Connect Spotify"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16.5a5.5 5.5 0 0 1 0-11h3"/><path d="M16 7.5a5.5 5.5 0 0 1 0 11h-3"/><path d="M9 12h6"/><path d="M12 9l3 3-3 3"/></svg></button>
+<button id="mobile-lyrics-button" aria-label="Find lyrics" title="Find lyrics"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-4 0h8"/></svg></button>
+<button id="mobile-background-button" aria-label="Disable dynamic background" aria-pressed="true" title="Toggle dynamic background"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4m0-12.8L17 7M7 17l-1.4 1.4"/><circle cx="12" cy="12" r="4"/><path d="M9 12c1-2 2 2 3 0s2-2 3 0"/></svg></button>
 </nav>
 <p class="muted">Experimental lyric lookup. Synced lyrics highlight by line when timing data is available.</p>
 <script type="module" src="/app.js"></script>
