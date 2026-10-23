@@ -460,27 +460,12 @@ $('check').onclick=playback;
 $('find-lyrics').onclick=()=>findLyrics();
 $('dynamic-background-toggle').onclick=()=>setDynamicBackgroundEnabled(!dynamicBackgroundEnabled);
 $('mobile-refresh').onclick=playback;
-$('mobile-reload').onclick=playback;
-$('mobile-lyrics').onclick=()=>findLyrics();
-$('mobile-lyrics-button').onclick=()=>findLyrics();
-$('mobile-connect').onclick=()=>{ if($('connect').hidden) $('disconnect').click(); else location.href='/auth/login'; };
-$('mobile-disconnect').onclick=()=>$('disconnect').click();
-$('mobile-background').onclick=()=>$('dynamic-background-toggle').click();
-$('mobile-background-button').onclick=()=>$('dynamic-background-toggle').click();
-$('mobile-background-button').setAttribute('aria-pressed', String(dynamicBackgroundEnabled));
-$('mobile-lyrics-button').onclick=()=>{ if(currentTrackId) findLyrics(); else playback(); };
-$('mobile-more').onclick=()=> $('mobile-more-menu').classList.toggle('open');
-$('mobile-fullscreen').onclick=async()=>{
-  try {
-    if(!document.fullscreenElement) await document.documentElement.requestFullscreen();
-    else await document.exitFullscreen();
-  } catch { /* Fullscreen may be unavailable in some browsers. */ }
+$('mobile-connect').onclick=()=>{
+  if($('disconnect').hidden) location.href='/auth/login';
+  else $('disconnect').click();
 };
-$('mobile-settings').onclick=()=> $('mobile-more-menu').classList.toggle('open');
-for(const id of ['mobile-shuffle','mobile-previous','mobile-play','mobile-next','mobile-repeat','mobile-translate']){
-  $(id).disabled=true;
-  $(id).style.opacity='.72';
-}
+$('mobile-lyrics-button').onclick=()=>currentTrackId ? findLyrics() : playback();
+$('mobile-background-button').onclick=()=> $('dynamic-background-toggle').click();
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('Disconnected from Spotify.')}catch(e){say('Could not disconnect: '+e.message)}};
 function animateAMLL(frameTime){
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
