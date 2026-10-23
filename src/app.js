@@ -23,13 +23,78 @@ let progressObservedAt = Date.now();
 let isPlaying = false;
 let ambientLayerIndex = 0;
 let dynamicBackgroundEnabled = true;
-function setAmbientBackground(imageUrl){
-  if(!imageUrl || !dynamicBackgroundEnabled) return;
+let ambientImageUrl = '';
+let ambientRequestId = 0;
+const fallbackMeshColors = [[255, 91, 164], [107, 78, 255], [30, 190, 220], [255, 166, 72], [110, 218, 143]];
+function rgbString(rgb, alpha = 1){
+  return 'rgba(' + rgb.map(value => Math.round(value)).join(',') + ',' + alpha + ')';
+}
+function makeMeshGradient(colors){
+  const positions = [[18, 22], [78, 20], [52, 78], [8, 76], [91, 68]];
+  return colors.map((color, index) =>
+    'radial-gradient(ellipse at ' + positions[index][0] + '% ' + positions[index][1] + '%, ' +
+    rgbString(color, 0.95) + ' 0%, ' + rgbString(color, 0.48) + ' 22%, transparent 62%)'
+  ).join(',');
+}
+function extractArtworkColors(imageUrl, requestId){
+  return new Promise(resolve => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      if(requestId !== ambientRequestId) return resolve(null);
+      try {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if(!context) return resolve(null);
+        const size = 48;
+        canvas.width = size;
+        canvas.height = size;
+        context.drawImage(image, 0, 0, size, size);
+        const pixels = context.getImageData(0, 0, size, size).data;
+        const bins = new Map();
+        for(let i = 0; i < pixels.length; i += 4 * 3){
+          const alpha = pixels[i + 3] / 255;
+          if(alpha < 0.6) continue;
+          let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+          const max = Math.max(r, g, b), min = Math.min(r, g, b);
+          if(max < 28 || max - min < 12) continue;
+          const key = [r, g, b].map(value => Math.round(value / 32)).join(',');
+          const bin = bins.get(key) || { count: 0, r: 0, g: 0, b: 0 };
+          bin.count++;
+          bin.r += r; bin.g += g; bin.b += b;
+          bins.set(key, bin);
+        }
+        const ranked = Array.from(bins.values()).sort((a, b) => b.count - a.count);
+        const colors = [];
+        for(const bin of ranked){
+          const color = [bin.r / bin.count, bin.g / bin.count, bin.b / bin.count];
+          if(colors.every(existing => Math.sqrt(existing.reduce((sum, value, index) => sum + (value - color[index]) ** 2, 0)) > 55)){
+            colors.push(color);
+          }
+          if(colors.length === 5) break;
+        }
+        while(colors.length < 5){
+          colors.push(fallbackMeshColors[colors.length]);
+        }
+        resolve(colors);
+      } catch {
+        resolve(null);
+      }
+    };
+    image.onerror = () => resolve(null);
+    image.src = imageUrl;
+  });
+}
+async function setAmbientBackground(imageUrl){
+  if(!imageUrl) return;
+  ambientImageUrl = imageUrl;
+  const requestId = ++ambientRequestId;
+  const colors = await extractArtworkColors(imageUrl, requestId);
+  if(requestId !== ambientRequestId || !dynamicBackgroundEnabled) return;
   const layers = Array.from(document.querySelectorAll('.ambient-layer'));
   if(layers.length !== 2) return;
   const nextIndex = 1 - ambientLayerIndex;
-  const safeUrl = String(imageUrl).replace(/["\\]/g, '');
-  layers[nextIndex].style.backgroundImage = 'url("' + safeUrl + '")';
+  layers[nextIndex].style.backgroundImage = makeMeshGradient(colors || fallbackMeshColors);
   layers[nextIndex].classList.add('active');
   layers[ambientLayerIndex].classList.remove('active');
   ambientLayerIndex = nextIndex;
@@ -40,6 +105,7 @@ function setDynamicBackgroundEnabled(enabled){
   const button = $('dynamic-background-toggle');
   button.textContent = 'Dynamic background: ' + (enabled ? 'On' : 'Off');
   button.setAttribute('aria-pressed', String(enabled));
+  if(enabled && ambientImageUrl) void setAmbientBackground(ambientImageUrl);
 }
 function say(message){ $('status').textContent = message; }
 async function api(path, options={}) {
