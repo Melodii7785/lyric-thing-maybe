@@ -306,6 +306,243 @@ a:focus-visible {
     flex: 1 1 auto;
   }
 }
+
+/* Immersive phone player */
+.mobile-progress { display: none; }
+@media (max-width: 600px) {
+  body {
+    width: 100%;
+    max-width: none;
+    min-height: 100svh;
+    padding: max(12px, env(safe-area-inset-top)) 20px calc(174px + env(safe-area-inset-bottom));
+  }
+  body > .eyebrow, body > h1, body > p { display: none; }
+  .panel {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  #connection, #status { display: none; }
+  .track {
+    position: sticky;
+    z-index: 5;
+    top: 0;
+    margin: 0 -4px;
+    padding: 12px 4px 18px;
+    gap: 14px;
+    background: linear-gradient(180deg, #071a28aa, #071a281f);
+    border-radius: 0;
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+  }
+  #cover {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    border-radius: 9px;
+    box-shadow: 0 5px 18px #0004;
+  }
+  .track h2 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.05rem;
+    letter-spacing: -.035em;
+  }
+  .track p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track .muted { font-size: .78rem; }
+  #lyrics-panel {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  #lyrics-panel h2 { display: none; }
+  #lyrics-meta { font-size: .74rem; opacity: .68; margin: 0 0 8px; }
+  #lyrics {
+    height: calc(100svh - 330px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    min-height: 260px;
+    max-height: none;
+    margin: 0 -3px;
+    overflow: hidden;
+    mask-image: linear-gradient(180deg, transparent 0%, #000 10%, #000 83%, transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 10%, #000 83%, transparent 100%);
+  }
+  #lyrics-attribution { display: none; }
+  .mobile-progress:not([hidden]) {
+    display: block;
+    position: fixed;
+    z-index: 20;
+    left: 22px;
+    right: 22px;
+    bottom: calc(108px + env(safe-area-inset-bottom));
+    padding: 0;
+    border: 0;
+  }
+  .progress-track {
+    height: 4px;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #ffffff30;
+    box-shadow: 0 1px 4px #0002;
+  }
+  #progress-fill {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: #fff;
+    transition: width .35s linear;
+  }
+  .progress-times {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    color: #ffffffc9;
+    font-size: .78rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .actions {
+    position: fixed;
+    z-index: 30;
+    left: 12px;
+    right: 12px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid #ffffff30;
+    border-radius: 28px;
+    background: #102b4380;
+    box-shadow: 0 12px 40px #0003, inset 0 1px #ffffff18;
+    backdrop-filter: blur(28px) saturate(1.45);
+    -webkit-backdrop-filter: blur(28px) saturate(1.45);
+  }
+  .actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 42px;
+    flex: 1 1 0;
+    padding: 8px 7px;
+    border: 1px solid #ffffff38;
+    border-radius: 999px;
+    background: #ffffff15;
+    color: #fff;
+    font-size: .68rem;
+    line-height: 1.1;
+    text-align: center;
+    box-shadow: inset 0 1px #ffffff18;
+  }
+  .actions button:first-child { background: #ffffff28; }
+  .actions button[hidden] { display: none; }
+  #dynamic-background { inset: -14%; }
+  .ambient-shade {
+    background: linear-gradient(180deg, #07152130 0%, #07152110 38%, #07152162 75%, #071521a8 100%);
+  }
+}
+@media (max-width: 380px) {
+  body { padding-left: 15px; padding-right: 15px; }
+  .actions { gap: 6px; left: 8px; right: 8px; padding: 8px; }
+  .actions button { font-size: .61rem; padding-inline: 4px; }
+}
+
+
+/* Screenshot-inspired, edge-to-edge mobile now-playing screen */
+@media (max-width: 600px) {
+  html, body { min-height:100%; }
+  body {
+    padding: max(12px, env(safe-area-inset-top)) 20px calc(168px + env(safe-area-inset-bottom));
+    overflow-x:hidden;
+  }
+  body > .eyebrow, body > h1, body > p { display:none !important; }
+  .panel { margin:0; padding:0; background:transparent; border:0; border-radius:0; box-shadow:none; }
+  #connection, #status { display:none !important; }
+  .track {
+    position:fixed; z-index:30; top:0; left:0; right:0;
+    margin:0; padding:calc(env(safe-area-inset-top) + 12px) 20px 12px;
+    display:flex; align-items:center; gap:14px;
+    background:linear-gradient(180deg, #061a29d9, #061a2970);
+    border:0; border-radius:0;
+    backdrop-filter:blur(24px) saturate(1.25);
+    -webkit-backdrop-filter:blur(24px) saturate(1.25);
+  }
+  #cover { width:72px; height:72px; flex:0 0 72px; border-radius:2px; box-shadow:0 5px 22px #0005; }
+  .track > div { min-width:0; flex:1; }
+  .track h2 { font-size:1.22rem; line-height:1.14; margin:0 0 5px; letter-spacing:-.045em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .track p { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .track #artist { font-size:.92rem; }
+  .track .muted { font-size:.78rem; }
+  #album, #playstate { display:none; }
+  #lyrics-panel { display:flex; flex-direction:column; margin:0; padding:0; border:0; }
+  #lyrics-panel h2 { display:none; }
+  #lyrics-meta { position:absolute; top:calc(env(safe-area-inset-top) + 94px); left:20px; right:20px; margin:0; font-size:.72rem; opacity:.65; }
+  #lyrics {
+    position:fixed; top:calc(env(safe-area-inset-top) + 100px); bottom:calc(190px + env(safe-area-inset-bottom));
+    left:20px; right:20px; width:auto; height:auto; max-height:none; min-height:0;
+    margin:0; overflow:hidden;
+    mask-image:linear-gradient(180deg,transparent 0%,#000 8%,#000 84%,transparent 100%);
+    -webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 8%,#000 84%,transparent 100%);
+  }
+  #lyrics .amll-lyric-player { text-align:left; }
+  #lyrics-attribution { display:none; }
+  .mobile-progress:not([hidden]) {
+    display:block; position:fixed; z-index:40; left:22px; right:22px;
+    bottom:calc(112px + env(safe-area-inset-bottom)); padding:0; border:0;
+  }
+  .progress-track { height:4px; overflow:hidden; border-radius:10px; background:#ffffff35; }
+  #progress-fill { height:100%; width:0; border-radius:inherit; background:#fff; }
+  .progress-times { display:flex; justify-content:space-between; margin-top:8px; color:#ffffffd0; font-size:.78rem; font-variant-numeric:tabular-nums; }
+  .mobile-dock {
+    position:fixed; z-index:50; left:14px; right:14px;
+    bottom:calc(12px + env(safe-area-inset-bottom));
+    display:flex; flex-direction:column; gap:12px; pointer-events:none;
+  }
+  .mobile-dock button { pointer-events:auto; color:#fff; font:inherit; cursor:pointer; }
+  .mobile-dock .transport {
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:0 8px; border:0; background:transparent;
+  }
+  .mobile-dock .transport button {
+    display:flex; align-items:center; justify-content:center; min-width:38px; min-height:48px;
+    padding:0; border:0; background:transparent; color:#fff; font-size:1.65rem;
+  }
+  .mobile-dock .transport .main-action { font-size:2.65rem; min-width:58px; }
+  .mobile-dock .utilities {
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .mobile-dock .utilities button {
+    width:48px; height:48px; flex:0 0 48px; display:flex; align-items:center; justify-content:center;
+    padding:0; border:1px solid #ffffff45; border-radius:50%;
+    background:#ffffff17; box-shadow:inset 0 1px #ffffff22, 0 4px 16px #0002;
+    backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4);
+    font-size:1.15rem;
+  }
+  .mobile-dock button:active { transform:scale(.94); background:#ffffff30; }
+  .mobile-dock .more-menu {
+    display:none; align-self:flex-end; flex-wrap:wrap; justify-content:flex-end; gap:8px;
+    padding:12px; border:1px solid #ffffff35; border-radius:20px; background:#102b43d9;
+    backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+  }
+  .mobile-dock .more-menu.open { display:flex; }
+  .mobile-dock .more-menu button { padding:10px 13px; border:1px solid #ffffff30; border-radius:20px; background:#ffffff18; font-size:.8rem; }
+  .actions { display:none !important; }
+  #dynamic-background { inset:-14%; }
+  .ambient-shade { background:linear-gradient(180deg,#07152138 0%,#07152108 35%,#07152148 72%,#071521a8 100%); }
+}
+@media(max-width:380px) {
+  .mobile-dock .utilities button { width:42px; height:42px; flex-basis:42px; }
+  .mobile-dock .transport { gap:6px; }
+}
+
 </style>
 </head>
 <body>
@@ -327,6 +564,10 @@ a:focus-visible {
     <img id="cover" alt="Album cover">
     <div><h2 id="title">Nothing playing</h2><p id="artist"></p><p class="muted" id="album"></p><p class="muted" id="playstate"></p></div>
   </div>
+  <div class="mobile-progress" id="mobile-progress" hidden aria-label="Track progress">
+    <div class="progress-track"><div id="progress-fill"></div></div>
+    <div class="progress-times"><span id="progress-current">0:00</span><span id="progress-duration">0:00</span></div>
+  </div>
   <div id="lyrics-panel" hidden>
     <h2>the words™</h2>
     <p id="lyrics-meta">Waiting for lyrics…</p>
@@ -334,6 +575,31 @@ a:focus-visible {
     <p class="muted" id="lyrics-attribution">Lyrics provider attribution will appear here.</p>
   </div>
 </section>
+<nav class="mobile-dock" aria-label="Mobile player controls">
+  <div class="more-menu" id="mobile-more-menu">
+    <button id="mobile-connect">Connect Spotify</button>
+    <button id="mobile-refresh">Refresh playback</button>
+    <button id="mobile-lyrics">Reload lyrics</button>
+    <button id="mobile-background">Background: On</button>
+    <button id="mobile-disconnect">Disconnect</button>
+  </div>
+  <div class="transport">
+    <button id="mobile-shuffle" aria-label="Shuffle (Spotify controls unavailable)" title="Spotify playback controls are not available here">⤨</button>
+    <button id="mobile-previous" aria-label="Previous track (Spotify controls unavailable)" title="Spotify playback controls are not available here">|◀</button>
+    <button class="main-action" id="mobile-play" aria-label="Playback status" title="Playback is controlled in Spotify">Ⅱ</button>
+    <button id="mobile-next" aria-label="Next track (Spotify controls unavailable)" title="Spotify playback controls are not available here">▶|</button>
+    <button id="mobile-repeat" aria-label="Repeat (Spotify controls unavailable)" title="Spotify playback controls are not available here">↻</button>
+  </div>
+  <div class="utilities">
+    <button id="mobile-translate" aria-label="Translation unavailable" title="Translation isn't implemented yet">文</button>
+    <button id="mobile-reload" aria-label="Refresh playback" title="Refresh playback">↻</button>
+    <button id="mobile-fullscreen" aria-label="Toggle fullscreen" title="Toggle fullscreen">⛶</button>
+    <button id="mobile-lyrics-button" aria-label="Reload lyrics" title="Reload lyrics">☷</button>
+    <button id="mobile-background-button" aria-label="Toggle dynamic background" title="Toggle dynamic background">☼</button>
+    <button id="mobile-settings" aria-label="Player options" title="Player options">☷</button>
+    <button id="mobile-more" aria-label="More options" title="More options">•••</button>
+  </div>
+</nav>
 <p class="muted">Experimental lyric lookup. Synced lyrics highlight by line when timing data is available.</p>
 <script type="module" src="/app.js"></script>
 </body>

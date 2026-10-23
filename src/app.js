@@ -19,6 +19,7 @@ amllPlayer.setOptimizeOptions({
   tryAdvanceStartTime: false
 });
 let latestProgressMs = 0;
+let latestDurationMs = 0;
 let progressObservedAt = Date.now();
 let isPlaying = false;
 let ambientLayerIndex = 0;
@@ -164,7 +165,22 @@ async function api(path, options={}) {
   if (!response.ok) throw new Error(data.error || 'Request failed ('+response.status+')');
   return data;
 }
-function clearTrack(){ $('track').hidden=true; $('cover').style.display='none'; }
+function clearTrack(){
+  $('track').hidden=true;
+  $('cover').style.display='none';
+  $('mobile-progress').hidden=true;
+}
+function formatClock(milliseconds){
+  const seconds=Math.max(0,Math.floor((Number(milliseconds)||0)/1000));
+  return Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');
+}
+function updateMobileProgress(){
+  const duration=latestDurationMs;
+  const progress=Math.min(duration||0,Math.max(0,currentPlaybackSeconds()*1000));
+  $('progress-fill').style.width=(duration?Math.min(100,progress/duration*100):0)+'%';
+  $('progress-current').textContent=formatClock(progress);
+  $('progress-duration').textContent=formatClock(duration);
+}
 function clearLyrics(){
   lyricLines=[];
   if(amllPlayer){
@@ -356,6 +372,8 @@ async function playback(){
     $('playstate').textContent=data.playing ? '▶ Playing' : 'Ⅱ Paused';
     if(data.track.image){ $('cover').src=data.track.image; $('cover').style.display='block'; setAmbientBackground(data.track.image); } else $('cover').style.display='none';
     latestProgressMs=Number(data.progressMs||0);
+    latestDurationMs=Number(data.track.durationMs||0);
+    $('mobile-progress').hidden=!latestDurationMs;
     progressObservedAt=Date.now();
     isPlaying=!!data.playing;
     if(amllPlayer){
@@ -432,6 +450,7 @@ function animateAMLL(frameTime){
     amllPlayer.update(delta);
   }
   updateBeatPulse();
+  updateMobileProgress();
   requestAnimationFrame(animateAMLL);
 }
 requestAnimationFrame(animateAMLL);
