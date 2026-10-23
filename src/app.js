@@ -361,7 +361,7 @@ async function findLyrics({ automatic = false, trackId = currentTrackId } = {}){
 }
 function startPolling(){
   stopPolling();
-  poller=setInterval(playback,80);
+  poller=setInterval(playback,1000);
 }
 function stopPolling(){
   if(poller) clearInterval(poller);
