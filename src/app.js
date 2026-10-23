@@ -25,6 +25,9 @@ let ambientLayerIndex = 0;
 let dynamicBackgroundEnabled = true;
 let ambientImageUrl = '';
 let ambientRequestId = 0;
+let beatAnalysis = null;
+let beatAnalysisTrackId = null;
+let beatPulse = 0;
 const fallbackMeshColors = [[255, 91, 164], [107, 78, 255], [30, 190, 220], [255, 166, 72], [110, 218, 143]];
 function rgbString(rgb, alpha = 1){
   return 'rgba(' + rgb.map(value => Math.round(value)).join(',') + ',' + alpha + ')';
@@ -98,6 +101,53 @@ async function setAmbientBackground(imageUrl, force = false){
   layers[nextIndex].classList.add('active');
   layers[ambientLayerIndex].classList.remove('active');
   ambientLayerIndex = nextIndex;
+}
+function loadBeatAnalysis(trackId){
+  if(!trackId || !/^[A-Za-z0-9]{22}$/.test(trackId)){
+    beatAnalysis = null;
+    beatAnalysisTrackId = trackId;
+    return;
+  }
+  if(beatAnalysisTrackId === trackId) return;
+  beatAnalysisTrackId = trackId;
+  beatAnalysis = null;
+  api('/api/spotify/analysis?trackId=' + encodeURIComponent(trackId))
+    .then(data => {
+      if(currentTrackId !== trackId || beatAnalysisTrackId !== trackId) return;
+      const beats = Array.isArray(data.beats) ? data.beats
+        .filter(beat => Number.isFinite(beat.start) && Number.isFinite(beat.duration) && beat.duration > 0)
+        .sort((a,b) => a.start - b.start) : [];
+      beatAnalysis = beats.length ? beats : null;
+    })
+    .catch(() => {
+      // Audio analysis is optional; keep the ordinary ambient gradient working.
+      if(beatAnalysisTrackId === trackId) beatAnalysis = null;
+    });
+}
+function updateBeatPulse(){
+  const background = $('dynamic-background');
+  if(!dynamicBackgroundEnabled || !isPlaying || !beatAnalysis?.length){
+    beatPulse *= 0.82;
+  } else {
+    const time = currentPlaybackSeconds();
+    let low = 0, high = beatAnalysis.length - 1;
+    while(low < high){
+      const mid = Math.ceil((low + high) / 2);
+      if(beatAnalysis[mid].start <= time) low = mid;
+      else high = mid - 1;
+    }
+    const beat = beatAnalysis[low];
+    if(beat && time >= beat.start){
+      const elapsed = time - beat.start;
+      const decay = Math.max(0, 1 - elapsed / Math.min(beat.duration, 0.65));
+      const confidence = Number.isFinite(beat.confidence) ? Math.max(0.35, Math.min(1, beat.confidence)) : 0.8;
+      beatPulse = Math.max(beatPulse * 0.72, decay * confidence);
+    } else {
+      beatPulse *= 0.82;
+    }
+  }
+  background.style.setProperty('--beat-brightness', (1 + beatPulse * 0.16).toFixed(3));
+  background.style.setProperty('--beat-zoom', (1 + beatPulse * 0.025).toFixed(3));
 }
 function setDynamicBackgroundEnabled(enabled){
   dynamicBackgroundEnabled = enabled;
@@ -297,6 +347,8 @@ async function playback(){
     const nextTrackId = data.track.id || `${data.track.title}::${(data.track.artists || []).join(', ')}`;
     const trackChanged = nextTrackId !== currentTrackId;
     currentTrackId = nextTrackId;
+    if(trackChanged){ beatAnalysis = null; beatAnalysisTrackId = null; beatPulse = 0; }
+    loadBeatAnalysis(data.track.id);
     $('track').hidden=false;
     $('title').textContent=data.track.title;
     $('artist').textContent=(data.track.artists||[]).join(', ') || 'Unknown artist';
@@ -379,6 +431,7 @@ function animateAMLL(frameTime){
     amllPlayer.setCurrentTime(Math.round(currentPlaybackSeconds()*1000));
     amllPlayer.update(delta);
   }
+  updateBeatPulse();
   requestAnimationFrame(animateAMLL);
 }
 requestAnimationFrame(animateAMLL);
