@@ -28,7 +28,7 @@ function setAmbientBackground(imageUrl){
   const layers = Array.from(document.querySelectorAll('.ambient-layer'));
   if(layers.length !== 2) return;
   const nextIndex = 1 - ambientLayerIndex;
-  const safeUrl = String(imageUrl).replace(/["\\\\\n\r]/g, '');
+  const safeUrl = String(imageUrl).replace(/["\\]/g, '');
   layers[nextIndex].style.backgroundImage = 'url("' + safeUrl + '")';
   layers[nextIndex].classList.add('active');
   layers[ambientLayerIndex].classList.remove('active');
