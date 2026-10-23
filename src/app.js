@@ -147,7 +147,7 @@ function updateBeatPulse(){
     }
   }
   background.style.setProperty('--beat-brightness', (1 + beatPulse * 0.16).toFixed(3));
-  background.style.setProperty('--beat-zoom', (1 + beatPulse * 0.025).toFixed(3));
+  background.style.setProperty('--beat-background-size', (150 + beatPulse * 4).toFixed(2) + '%');
 }
 function setDynamicBackgroundEnabled(enabled){
   dynamicBackgroundEnabled = enabled;
