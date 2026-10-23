@@ -197,6 +197,58 @@ async function handle(request: Request, env: Env): Promise<Response> {
       durationMs: track.duration_ms ?? null, uri: track.uri ?? null,
     }});
   }
+  if (path === "/api/spotify/analysis" && request.method === "GET") {
+    const session = await getSession(request, env);
+    if (!session) return json({ error: "not_connected" }, 401);
+    const trackId = url.searchParams.get("trackId") || "";
+    if (!/^[A-Za-z0-9]{22}$/.test(trackId)) return json({ error: "invalid_track_id" }, 400);
+
+    // Only fetch analysis for the account's currently playing track.
+    let playbackResponse: Response;
+    try {
+      const freshSession = await refresh(session, env);
+      playbackResponse = await fetch(API_URL + "/me/player/currently-playing", {
+        headers: { authorization: "Bearer " + await decrypt(env, freshSession.access_token_enc), accept: "application/json" },
+      });
+    } catch {
+      return json({ error: "analysis_unavailable" }, 502);
+    }
+    if (playbackResponse.status === 204 || playbackResponse.status === 202) return json({ error: "nothing_playing" }, 404);
+    if (!playbackResponse.ok) return json({ error: "analysis_unavailable" }, 502);
+    const playback = await playbackResponse.json() as any;
+    if (playback?.item?.id !== trackId) return json({ error: "track_changed" }, 409);
+
+    // Spotify's web-player analysis endpoint is undocumented. Treat it as optional and fail soft.
+    try {
+      const embedResponse = await fetch("https://open.spotify.com/embed/track/" + trackId, {
+        headers: { "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36" },
+      });
+      if (!embedResponse.ok) return json({ error: "analysis_unavailable" }, 502);
+      const embedHtml = await embedResponse.text();
+      const nextDataMatch = embedHtml.match(/<script[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+      if (!nextDataMatch) return json({ error: "analysis_unavailable" }, 502);
+      const pageData = JSON.parse(nextDataMatch[1]);
+      const token = pageData?.props?.pageProps?.state?.settings?.session?.accessToken;
+      if (typeof token !== "string" || !token) return json({ error: "analysis_unavailable" }, 502);
+
+      const analysisResponse = await fetch("https://spclient.wg.spotify.com/audio-attributes/v1/audio-analysis/" + trackId + "?format=json", {
+        headers: { authorization: "Bearer " + token, "app-platform": "WebPlayer", accept: "application/json" },
+      });
+      if (!analysisResponse.ok) return json({ error: "analysis_unavailable" }, 502);
+      const analysis = await analysisResponse.json() as any;
+      const beats = Array.isArray(analysis?.beats) ? analysis.beats
+        .filter((beat: any) => Number.isFinite(beat?.start) && Number.isFinite(beat?.duration) && beat.duration > 0)
+        .map((beat: any) => ({
+          start: beat.start,
+          duration: beat.duration,
+          confidence: Number.isFinite(beat.confidence) ? beat.confidence : 0.8,
+        })) : [];
+      if (!beats.length) return json({ error: "analysis_unavailable" }, 502);
+      return json({ trackId, tempo: Number.isFinite(analysis?.track?.tempo) ? analysis.track.tempo : null, beats });
+    } catch {
+      return json({ error: "analysis_unavailable" }, 502);
+    }
+  }
   if (path === "/api/lyrics" && request.method === "GET") {
     let session = await getSession(request, env);
     if (!session) return json({ error: "not_connected" }, 401);
