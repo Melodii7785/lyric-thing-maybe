@@ -175,6 +175,7 @@ function formatClock(milliseconds){
   return Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');
 }
 function updateMobileProgress(){
+  const bgButton=$('mobile-background'); if(bgButton) bgButton.textContent='Background: '+(dynamicBackgroundEnabled?'On':'Off');
   const duration=latestDurationMs;
   const progress=Math.min(duration||0,Math.max(0,currentPlaybackSeconds()*1000));
   $('progress-fill').style.width=(duration?Math.min(100,progress/duration*100):0)+'%';
@@ -370,6 +371,7 @@ async function playback(){
     $('artist').textContent=(data.track.artists||[]).join(', ') || 'Unknown artist';
     $('album').textContent=data.track.album || '';
     $('playstate').textContent=data.playing ? '▶ Playing' : 'Ⅱ Paused';
+    const mobilePlay=$('mobile-play'); if(mobilePlay){ mobilePlay.textContent=data.playing?'Ⅱ':'▶'; mobilePlay.setAttribute('aria-label',data.playing?'Playing in Spotify':'Paused in Spotify'); }
     if(data.track.image){ $('cover').src=data.track.image; $('cover').style.display='block'; setAmbientBackground(data.track.image); } else $('cover').style.display='none';
     latestProgressMs=Number(data.progressMs||0);
     latestDurationMs=Number(data.track.durationMs||0);
@@ -441,6 +443,26 @@ $('connect').onclick=()=>location.href='/auth/login';
 $('check').onclick=playback;
 $('find-lyrics').onclick=()=>findLyrics();
 $('dynamic-background-toggle').onclick=()=>setDynamicBackgroundEnabled(!dynamicBackgroundEnabled);
+$('mobile-refresh').onclick=playback;
+$('mobile-reload').onclick=playback;
+$('mobile-lyrics').onclick=()=>findLyrics();
+$('mobile-lyrics-button').onclick=()=>findLyrics();
+$('mobile-connect').onclick=()=>location.href='/auth/login';
+$('mobile-disconnect').onclick=()=>$('disconnect').click();
+$('mobile-background').onclick=()=>$('dynamic-background-toggle').click();
+$('mobile-background-button').onclick=()=>$('dynamic-background-toggle').click();
+$('mobile-more').onclick=()=> $('mobile-more-menu').classList.toggle('open');
+$('mobile-fullscreen').onclick=async()=>{
+  try {
+    if(!document.fullscreenElement) await document.documentElement.requestFullscreen();
+    else await document.exitFullscreen();
+  } catch { /* Fullscreen may be unavailable in some browsers. */ }
+};
+$('mobile-settings').onclick=()=> $('mobile-more-menu').classList.toggle('open');
+for(const id of ['mobile-shuffle','mobile-previous','mobile-play','mobile-next','mobile-repeat','mobile-translate']){
+  $(id).disabled=true;
+  $(id).style.opacity='.72';
+}
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('Disconnected from Spotify.')}catch(e){say('Could not disconnect: '+e.message)}};
 function animateAMLL(frameTime){
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
