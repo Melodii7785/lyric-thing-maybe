@@ -306,6 +306,155 @@ a:focus-visible {
     flex: 1 1 auto;
   }
 }
+
+/* Immersive phone player */
+.mobile-progress { display: none; }
+@media (max-width: 600px) {
+  body {
+    width: 100%;
+    max-width: none;
+    min-height: 100svh;
+    padding: max(12px, env(safe-area-inset-top)) 20px calc(174px + env(safe-area-inset-bottom));
+  }
+  body > .eyebrow, body > h1, body > p { display: none; }
+  .panel {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  #connection, #status { display: none; }
+  .track {
+    position: sticky;
+    z-index: 5;
+    top: 0;
+    margin: 0 -4px;
+    padding: 12px 4px 18px;
+    gap: 14px;
+    background: linear-gradient(180deg, #071a28aa, #071a281f);
+    border-radius: 0;
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+  }
+  #cover {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    border-radius: 9px;
+    box-shadow: 0 5px 18px #0004;
+  }
+  .track h2 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.05rem;
+    letter-spacing: -.035em;
+  }
+  .track p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track .muted { font-size: .78rem; }
+  #lyrics-panel {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  #lyrics-panel h2 { display: none; }
+  #lyrics-meta { font-size: .74rem; opacity: .68; margin: 0 0 8px; }
+  #lyrics {
+    height: calc(100svh - 330px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    min-height: 260px;
+    max-height: none;
+    margin: 0 -3px;
+    overflow: hidden;
+    mask-image: linear-gradient(180deg, transparent 0%, #000 10%, #000 83%, transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 10%, #000 83%, transparent 100%);
+  }
+  #lyrics-attribution { display: none; }
+  .mobile-progress:not([hidden]) {
+    display: block;
+    position: fixed;
+    z-index: 20;
+    left: 22px;
+    right: 22px;
+    bottom: calc(108px + env(safe-area-inset-bottom));
+    padding: 0;
+    border: 0;
+  }
+  .progress-track {
+    height: 4px;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #ffffff30;
+    box-shadow: 0 1px 4px #0002;
+  }
+  #progress-fill {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: #fff;
+    transition: width .35s linear;
+  }
+  .progress-times {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    color: #ffffffc9;
+    font-size: .78rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .actions {
+    position: fixed;
+    z-index: 30;
+    left: 12px;
+    right: 12px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid #ffffff30;
+    border-radius: 28px;
+    background: #102b4380;
+    box-shadow: 0 12px 40px #0003, inset 0 1px #ffffff18;
+    backdrop-filter: blur(28px) saturate(1.45);
+    -webkit-backdrop-filter: blur(28px) saturate(1.45);
+  }
+  .actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 42px;
+    flex: 1 1 0;
+    padding: 8px 7px;
+    border: 1px solid #ffffff38;
+    border-radius: 999px;
+    background: #ffffff15;
+    color: #fff;
+    font-size: .68rem;
+    line-height: 1.1;
+    text-align: center;
+    box-shadow: inset 0 1px #ffffff18;
+  }
+  .actions button:first-child { background: #ffffff28; }
+  .actions button[hidden] { display: none; }
+  #dynamic-background { inset: -14%; }
+  .ambient-shade {
+    background: linear-gradient(180deg, #07152130 0%, #07152110 38%, #07152162 75%, #071521a8 100%);
+  }
+}
+@media (max-width: 380px) {
+  body { padding-left: 15px; padding-right: 15px; }
+  .actions { gap: 6px; left: 8px; right: 8px; padding: 8px; }
+  .actions button { font-size: .61rem; padding-inline: 4px; }
+}
+
 </style>
 </head>
 <body>
@@ -326,6 +475,10 @@ a:focus-visible {
   <div class="track" id="track" hidden>
     <img id="cover" alt="Album cover">
     <div><h2 id="title">Nothing playing</h2><p id="artist"></p><p class="muted" id="album"></p><p class="muted" id="playstate"></p></div>
+  </div>
+  <div class="mobile-progress" id="mobile-progress" hidden aria-label="Track progress">
+    <div class="progress-track"><div id="progress-fill"></div></div>
+    <div class="progress-times"><span id="progress-current">0:00</span><span id="progress-duration">0:00</span></div>
   </div>
   <div id="lyrics-panel" hidden>
     <h2>the words™</h2>
