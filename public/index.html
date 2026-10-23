@@ -543,6 +543,73 @@ a:focus-visible {
   .mobile-dock .transport { gap:6px; }
 }
 
+
+/* lrc.red-inspired responsive redesign */
+:root { color-scheme:light; background:#fff; color:#111; font-family:Arial,Helvetica,sans-serif; }
+html, body { background:#fff !important; color:#111; }
+body { max-width:900px; padding:0 26px 48px; }
+#dynamic-background { display:none !important; }
+body > .eyebrow {
+  display:block !important; margin:0 -26px 38px; padding:20px 26px;
+  background:#e60016; color:#fff; font-size:1.1rem; font-weight:700;
+  letter-spacing:-.02em; text-transform:none;
+}
+body > h1 { margin:0 0 10px; color:#d0d0d0; font-size:clamp(3.2rem,10vw,5rem); line-height:1; letter-spacing:-.07em; }
+body > p { color:#777; margin:0 0 30px; }
+.panel { margin:0; padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
+#connection { display:inline-block; color:#777; border:0; padding:0; margin:0 0 12px; }
+.actions { display:flex; gap:8px; margin:0 0 26px; flex-wrap:wrap; }
+button { background:#e60016; color:#fff; border-radius:3px; padding:10px 14px; box-shadow:none; }
+button:hover { transform:none; filter:brightness(.94); }
+button.secondary { background:#fff; color:#222; border:1px solid #bbb; border-radius:3px; }
+#status { margin:0 0 24px; color:#777; }
+.track { margin:0 0 28px; padding:0 0 18px; border-radius:0; border-bottom:3px solid #111; background:transparent; gap:16px; }
+#cover { display:none; width:88px; height:88px; flex:0 0 88px; border-radius:0; box-shadow:none; }
+.track h2 { color:#111; font-size:1.3rem; margin:0 0 5px; }
+.track p { color:#777; margin:0; line-height:1.45; }
+.track .muted { font-size:.9rem; }
+#lyrics-panel { margin:0; padding:0; border:0; }
+#lyrics-panel h2 { display:block; color:#d0d0d0; font-size:clamp(2.8rem,8vw,4.2rem); line-height:1; letter-spacing:-.07em; margin:0 0 10px; }
+#lyrics-meta { margin:0 0 18px; color:#777; font-size:.85rem; }
+#lyrics { height:min(58vh,620px); min-height:280px; max-height:none; margin:0; overflow:hidden; --amll-lp-color:#111; --amll-lp-bg-color:transparent; }
+#lyrics .amll-lyric-player { color:#111; background:transparent; font-family:Arial,Helvetica,sans-serif !important; }
+#lyrics .amll-lyric-player * { font-family:Arial,Helvetica,sans-serif !important; }
+#lyrics-attribution { margin-top:22px; padding-top:14px; border-top:1px solid #ddd; color:#777; }
+a { color:#e60016; }
+.mobile-progress { display:block; margin:0 0 18px; }
+.progress-track { height:4px; background:#ddd; border-radius:0; }
+#progress-fill { background:#e60016; }
+.progress-times { display:flex; justify-content:space-between; margin-top:6px; color:#777; font-size:.8rem; font-variant-numeric:tabular-nums; }
+.mobile-dock { display:none !important; }
+body > p.muted { margin-top:24px; padding-top:16px; border-top:1px solid #ddd; font-size:.82rem; }
+[hidden] { display:none !important; }
+@media(max-width:600px) {
+ body { width:100%; max-width:none; min-height:100svh; padding:0 26px calc(32px + env(safe-area-inset-bottom)); }
+ body > .eyebrow { margin:0 -26px 32px; padding:18px 26px; }
+ body > h1 { display:block !important; font-size:3.6rem; margin-bottom:10px; }
+ body > p { display:block !important; font-size:.95rem; margin-bottom:28px; }
+ #connection { display:inline-block !important; }
+ #status { display:block !important; font-size:.85rem; overflow-wrap:anywhere; }
+ .actions { display:flex !important; gap:8px; margin-bottom:26px; }
+ .actions button { flex:0 1 auto; min-height:40px; font-size:.85rem; padding:9px 12px; }
+ .track { position:static; display:flex; margin:0 0 24px; padding:0 0 18px; background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none; border-bottom:3px solid #111; }
+ #cover { width:64px; height:64px; flex-basis:64px; border-radius:0; }
+ .track h2 { font-size:1.15rem; }
+ #album, #playstate { display:block; }
+ #lyrics-panel { display:block !important; }
+ #lyrics-panel h2 { display:block; font-size:3.2rem; }
+ #lyrics-meta { position:static; opacity:1; font-size:.8rem; }
+ #lyrics { position:relative; inset:auto; width:100%; height:48vh; min-height:260px; max-height:none; margin:0; mask-image:none; -webkit-mask-image:none; overflow:hidden; }
+ .mobile-progress:not([hidden]) { display:block; position:static; margin:0 0 24px; padding:0; }
+ .progress-times { color:#777; }
+ #lyrics-attribution { display:block; }
+}
+@media(max-width:380px) {
+ body { padding-left:18px; padding-right:18px; }
+ body > .eyebrow { margin-left:-18px; margin-right:-18px; padding-left:18px; padding-right:18px; }
+ .actions button { font-size:.78rem; padding:8px 9px; }
+}
+
 </style>
 </head>
 <body>
