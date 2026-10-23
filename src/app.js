@@ -21,6 +21,26 @@ amllPlayer.setOptimizeOptions({
 let latestProgressMs = 0;
 let progressObservedAt = Date.now();
 let isPlaying = false;
+let ambientLayerIndex = 0;
+let dynamicBackgroundEnabled = true;
+function setAmbientBackground(imageUrl){
+  if(!imageUrl || !dynamicBackgroundEnabled) return;
+  const layers = Array.from(document.querySelectorAll('.ambient-layer'));
+  if(layers.length !== 2) return;
+  const nextIndex = 1 - ambientLayerIndex;
+  const safeUrl = String(imageUrl).replace(/["\\\\\n\r]/g, '');
+  layers[nextIndex].style.backgroundImage = 'url("' + safeUrl + '")';
+  layers[nextIndex].classList.add('active');
+  layers[ambientLayerIndex].classList.remove('active');
+  ambientLayerIndex = nextIndex;
+}
+function setDynamicBackgroundEnabled(enabled){
+  dynamicBackgroundEnabled = enabled;
+  $('dynamic-background').classList.toggle('off', !enabled);
+  const button = $('dynamic-background-toggle');
+  button.textContent = 'Dynamic background: ' + (enabled ? 'On' : 'Off');
+  button.setAttribute('aria-pressed', String(enabled));
+}
 function say(message){ $('status').textContent = message; }
 async function api(path, options={}) {
   const response = await fetch(path, { credentials:'same-origin', cache:'no-store', ...options });
@@ -216,7 +236,7 @@ async function playback(){
     $('artist').textContent=(data.track.artists||[]).join(', ') || 'Unknown artist';
     $('album').textContent=data.track.album || '';
     $('playstate').textContent=data.playing ? '▶ Playing' : 'Ⅱ Paused';
-    if(data.track.image){ $('cover').src=data.track.image; $('cover').style.display='block'; } else $('cover').style.display='none';
+    if(data.track.image){ $('cover').src=data.track.image; $('cover').style.display='block'; setAmbientBackground(data.track.image); } else $('cover').style.display='none';
     latestProgressMs=Number(data.progressMs||0);
     progressObservedAt=Date.now();
     isPlaying=!!data.playing;
@@ -284,6 +304,7 @@ function stopPolling(){
 $('connect').onclick=()=>location.href='/auth/login';
 $('check').onclick=playback;
 $('find-lyrics').onclick=()=>findLyrics();
+$('dynamic-background-toggle').onclick=()=>setDynamicBackgroundEnabled(!dynamicBackgroundEnabled);
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('Disconnected from Spotify.')}catch(e){say('Could not disconnect: '+e.message)}};
 function animateAMLL(frameTime){
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
