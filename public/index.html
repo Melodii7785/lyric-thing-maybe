@@ -565,6 +565,15 @@ body>.eyebrow,body>h1,body>p{display:none!important}
 }
 @media(max-width:380px){.mobile-dock{gap:9px;padding:8px 10px}.mobile-dock button{width:44px;height:44px;flex-basis:44px}}
 
+
+/* Keep native hidden state authoritative even when mobile layout uses display:flex/block. */
+@media (max-width: 600px) {
+  [hidden] { display: none !important; }
+  #track[hidden], #lyrics-panel[hidden], #mobile-progress[hidden] { display: none !important; }
+  #lyrics-panel:not([hidden]) { display: flex; }
+  #mobile-progress:not([hidden]) { display: block; }
+}
+
 </style>
 </head>
 <body>
