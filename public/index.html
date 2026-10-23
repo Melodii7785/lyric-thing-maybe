@@ -46,7 +46,47 @@
   box-sizing: border-box;
 }
 
+#dynamic-background {
+  position: fixed;
+  inset: -8%;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: #100f14;
+  opacity: 1;
+  transition: opacity 500ms ease;
+}
+
+#dynamic-background.off { opacity: 0; }
+
+.ambient-layer {
+  position: absolute;
+  inset: -6%;
+  background-position: center;
+  background-size: cover;
+  filter: blur(72px) saturate(1.45);
+  opacity: 0;
+  transform: scale(1.14);
+  transition: opacity 1.2s ease;
+  will-change: opacity, transform;
+}
+
+.ambient-layer.active { opacity: 0.72; animation: ambient-drift 24s ease-in-out infinite alternate; }
+
+@keyframes ambient-drift {
+  from { transform: scale(1.14) translate3d(-1.2%, -0.6%, 0); }
+  to { transform: scale(1.22) translate3d(1.2%, 0.8%, 0); }
+}
+
+.ambient-shade {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 35%, #100f1433 0%, #100f14a6 72%, #100f14e8 100%), linear-gradient(135deg, #100f1466, transparent 55%);
+}
+
 body {
+  position: relative;
+  z-index: 0;
   max-width: 900px;
   min-height: 100vh;
   margin: 0 auto;
@@ -268,6 +308,7 @@ a:focus-visible {
 </style>
 </head>
 <body>
+<div id="dynamic-background" aria-hidden="true"><div class="ambient-layer active"></div><div class="ambient-layer"></div><div class="ambient-shade"></div></div>
 <div class="eyebrow">a tiny music experiment</div>
 <h1>lyric thing™</h1>
 <p>find the words. hopefully. first, let's see what Spotify is playing right now.</p>
@@ -278,6 +319,7 @@ a:focus-visible {
     <button class="secondary" id="check">Check playback</button>
     <button class="secondary" id="find-lyrics" hidden>Find lyrics</button>
     <button class="secondary" id="disconnect">Disconnect</button>
+    <button class="secondary" id="dynamic-background-toggle" aria-pressed="true">Dynamic background: On</button>
   </div>
   <div id="status" role="status" aria-live="polite">Checking connection…</div>
   <div class="track" id="track" hidden>
