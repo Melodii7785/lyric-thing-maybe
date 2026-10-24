@@ -227,9 +227,9 @@ function renderSpicyLyrics(data){
   }
   const hasSyllableTiming=lyricLines.some(line=>line.words.some(word=>word.time!==null&&word.endTime!==null));
   $('lyrics-meta').textContent=body.Type==='Syllable'&&hasSyllableTiming
-    ? 'SPICY LYRICS BROUGHT THE WORDS and AMLL is doing the little karaoke dance. look at them go.'
+    ? 'we did it evergbkdy. the lyrics are SYLLABLE SYNCed. three cheers for tecknologi!!.'
     : body.Type==='Line'
-      ? 'i guess this works idk'
+      ? 'i guess this works idk. it's like spotify but best we got for this song'
       : 'vat ze fuck is zhis bro. regular lyriks? i asked for ze FANCI lyriks';
   loadIntoAMLL();
 }
@@ -343,7 +343,7 @@ async function loadDevices(){
     select.replaceChildren();
     if(!availableDevices.length){
       const option=document.createElement('option');
-      option.value=''; option.textContent='no devices found. open Spotify first pls';
+      option.value=''; option.textContent='no devices found. open Spotify first you idiot';
       select.append(option);
       selectedDeviceId='';
       status.textContent='open Spotify on your phone/computer/console/whatever and press look again. i believe in you';
@@ -361,7 +361,7 @@ async function loadDevices(){
       || availableDevices.find(device=>device.id&&!device.isRestricted);
     if(preferred){select.value=preferred.id;selectedDeviceId=preferred.id;}
     status.textContent=preferred
-      ? 'found '+preferred.name+'!! we can try controlling it. Spotify Premium is required for playback controls.'
+      ? 'found '+preferred.name+'!! we can try controlling it. spotify premium obligatory 4 plagback you loser'
       : 'devices exist but apparently none of them want to cooperate.';
   }catch(error){
     status.textContent='could not find the devices. rude. ('+error.message+')';
@@ -370,7 +370,7 @@ async function loadDevices(){
 async function playerCommand(action, extra={}){
   const deviceId=selectedDevice();
   if(!deviceId && action!=='shuffle'){
-    $('device-status').textContent='pick a device first bestie';
+    $('device-status').textContent='pick a device first idiot';
     return;
   }
   const buttons=['previous-track','play-pause','next-track','shuffle-toggle','repeat-toggle','refresh-devices'];
@@ -392,12 +392,12 @@ async function playerCommand(action, extra={}){
     await loadDevices();
   }catch(error){
     $('device-status').textContent=error.message==='spotify_no_active_device'
-      ? 'Spotify has no active device. open Spotify somewhere and try again pls.'
+      ? 'spotify has no active device. open Spotify somewhere and try again pls.'
       : error.message==='spotify_access_denied'
-        ? 'Spotify said NO to '+action+' (HTTP '+(error.status||403)+')'+(error.details?' · '+error.details:'')+'. check the active device/context. why are you like this Spotify.'
+        ? 'spotify said FUCK YOU to '+action+' (HTTP '+(error.status||403)+')'+(error.details?' · '+error.details:'')+'. check the active device/context. im crying spotify is so CRUEL'
         : error.message==='spotify_rate_limited'
-          ? 'Spotify is telling us to calm down. wait a sec and try again.'
-          : 'could not control Spotify: '+error.message+' (i am looking at you, Spotify)';
+          ? 'spotify is telling us to calm down. wait a sec and try again.'
+          : 'could not control spotify: '+error.message+' (i am looking at you, spotify)';
   }finally{
     buttons.forEach(id=>$(id).disabled=false);
   }
@@ -409,9 +409,9 @@ async function connection(){
     $('connect').hidden = data.connected;
     $('find-lyrics').hidden = !data.connected;
     $('disconnect').hidden = !data.connected;
-    if (!data.connected) { $('connect-controls').hidden=true; clearTrack(); clearLyrics(); say('hi!! connect Spotify so i can see what you are playing. i promise to be normal about it'); stopPolling(); }
+    if (!data.connected) { $('connect-controls').hidden=true; clearTrack(); clearLyrics(); say('hi!! connect spotify so i can see what you are playing. i promise to be normal about it'); stopPolling(); }
     else { say('WE ARE IN'+(data.user?.displayName ? ' as '+data.user.displayName : '')+'!! checking what is playing…'); await loadDevices(); await playback(); startPolling(); }
-  } catch(e){ say('uh oh. connection check failed: '+e.message+'\nthe Worker may be having a moment.'); }
+  } catch(e){ say('uh oh. connection check failed: '+e.message+'\nthe Worker™ may be having a moment.'); }
 }
 async function playback(){
   try {
@@ -423,7 +423,7 @@ async function playback(){
         clearLyrics();
       }
       clearTrack();
-      say('Spotify is connected but it is SILENT in here. play something and come back.');
+      say('Spotify is connected but it is silENT in here. play something and come back.');
       return;
     }
     const nextTrackId = data.track.id || `${data.track.title}::${(data.track.artists || []).join(', ')}`;
@@ -462,7 +462,7 @@ async function playback(){
   } catch(e) {
     clearTrack();
     if(e.message==='not_connected'||e.message==='spotify_reconnect_required'){ say('Spotify forgot who we are. reconnect and try again pls.'); stopPolling(); $('connection').textContent='not connected'; $('connect').hidden=false; $('find-lyrics').hidden=true; $('disconnect').hidden=true; }
-    else if(e.message==='spotify_access_denied') say('Spotify said we cannot look at playback. check the app permissions. Spotify please i am begging');
+    else if(e.message==='spotify_access_denied') say('spotify said fuck you and that we cannot look at playback. check the app permissions. spotify please i am begging');
     else say('i could not read playback: '+e.message+' :(');
   }
 }
