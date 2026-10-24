@@ -1,4 +1,9 @@
 import '@fontsource-variable/inter';
+import '@braccato/core/element';
+import '@braccato/core/styles/variables.css';
+import '@braccato/core/styles/lyrics.css';
+import '@braccato/core/styles/instrumental.css';
+import { TTMLParser } from '@braccato/parsers';
 
 const $ = id => document.getElementById(id);
 let poller = null;
@@ -7,6 +12,7 @@ let lyricRequestId = 0;
 let lyricLines = [];
 let lyricsAreSynced = false;
 let renderedLyricNodes = [];
+let braccatoLyrics = null;
 let activeLyricIndex = -1;
 let latestProgressMs = 0;
 let latestDurationMs = 0;
@@ -203,6 +209,22 @@ function setAttribution(source, uploadAttribution){
     addCredit('made by',uploadAttribution.Maker);
   }
 }
+function getBraccatoElement(){
+  if(!braccatoLyrics){
+    braccatoLyrics=document.createElement('braccato-lyrics');
+    braccatoLyrics.setAttribute('aria-label','Synchronized lyrics');
+    braccatoLyrics.style.display='block';
+    braccatoLyrics.style.width='100%';
+    $('lyrics').replaceChildren(braccatoLyrics);
+  }
+  return braccatoLyrics;
+}
+function renderBraccatoLyrics(lines){
+  const element=getBraccatoElement();
+  element.lyrics=lines;
+  element.currentTime=currentPlaybackSeconds();
+  element.playing=isPlaying;
+}
 function renderSpicyLyrics(data){
   clearLyrics();
   $('lyrics-panel').hidden=false;
@@ -235,7 +257,23 @@ function renderSpicyLyrics(data){
     : body.Type==='Line'
       ? 'Spicy Lyrics · line-synced lyrics.'
       : 'Spicy Lyrics · lyrics loaded.';
-  renderPlainLyrics();
+  const braccatoLines=lyricLines.map(line=>{
+    const parts=(line.words||[]).filter(word=>Number.isFinite(word.time)).map(word=>({
+      startTimeMs:word.time*1000,
+      words:word.text,
+      durationMs:Number.isFinite(word.endTime)&&word.endTime>word.time
+        ? (word.endTime-word.time)*1000 : 180,
+    }));
+    const startMs=(Number(line.time)||0)*1000;
+    const lastPartEnd=parts.reduce((max,part)=>Math.max(max,part.startTimeMs+part.durationMs),startMs);
+    return {
+      startTimeMs:startMs,
+      words:line.text,
+      durationMs:Math.max(500,parts.length?lastPartEnd-startMs:3000),
+      ...(parts.length?{parts}:{})
+    };
+  });
+  renderBraccatoLyrics(braccatoLines);
 }
 function timeSeconds(value){
   if(!value) return null;
@@ -262,7 +300,22 @@ function renderLyrics(data){
   clearLyrics();
   $('lyrics-panel').hidden=false;
   setAttribution('lrc.red');
-  lyricLines=parseTtml(data.ttml||'');
+  let parsed;
+  try {
+    parsed=TTMLParser.parse(data.ttml||'');
+    lyricLines=parsed.map(line=>({
+      time:(Number(line.startTimeMs)||0)/1000,
+      text:line.words||'',
+      words:(line.parts||[]).map(part=>({
+        text:part.words||'',
+        time:Number.isFinite(part.startTimeMs)?part.startTimeMs/1000:null,
+        endTime:Number.isFinite(part.startTimeMs)&&Number.isFinite(part.durationMs)
+          ? (part.startTimeMs+part.durationMs)/1000:null
+      }))
+    }));
+  } catch {
+    lyricLines=parseTtml(data.ttml||'');
+  }
   lyricsAreSynced=lyricLines.some(line=>line.words.some(word=>word.time!==null));
   if(!lyricLines.length){
     $('lyrics-meta').textContent='lrc.red returned a TTML file, but it did not contain readable lyric lines.';
@@ -271,7 +324,8 @@ function renderLyrics(data){
   $('lyrics-meta').textContent=lyricsAreSynced
     ? 'TTML lyrics loaded · synced highlighting enabled.'
     : 'TTML lyrics loaded · line timing only.';
-  renderPlainLyrics();
+  if(parsed) renderBraccatoLyrics(parsed);
+  else renderPlainLyrics();
 }
 function renderPlainLyrics(){
   const host = $('lyrics');
@@ -305,7 +359,13 @@ function currentPlaybackSeconds(){
   return latestProgressMs/1000+(isPlaying?(Date.now()-progressObservedAt)/1000:0);
 }
 function updateActiveLyric(){
-  if($('lyrics-panel').hidden || !renderedLyricNodes.length) return;
+  if($('lyrics-panel').hidden) return;
+  if(braccatoLyrics){
+    braccatoLyrics.currentTime=currentPlaybackSeconds();
+    braccatoLyrics.playing=isPlaying;
+    return;
+  }
+  if(!renderedLyricNodes.length) return;
   const time = currentPlaybackSeconds();
   let nextIndex = -1;
   for(let i=0; i<lyricLines.length; i++){
