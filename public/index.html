@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#18151d">
 <meta name="description" content="A tiny experimental companion for finding lyrics and detecting your currently playing Spotify track.">
 <title>lyric thing™</title>
-<link rel="stylesheet" href="/amll.css">
+
 <style>
 @font-face {
   font-family: "SF Pro Text";
@@ -628,6 +628,31 @@ body > p.muted { margin-top:24px; padding-top:16px; border-top:1px solid #ddd; f
 @media(max-width:600px) {
   #lyrics { height:52vh !important; min-height:300px !important; overflow-y:auto !important; gap:20px; }
   .lyric-line { font-size:1.3rem; }
+}
+
+
+/* Braccato synchronized lyrics renderer */
+#lyrics braccato-lyrics {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  color: inherit;
+  background: transparent;
+  --blyrics-font-family: inherit;
+  --blyrics-font-size: clamp(1.15rem, 2.5vw, 1.8rem);
+  --blyrics-line-height: 1.55;
+  --blyrics-active-color: #ff4b76;
+  --blyrics-inactive-color: #8e8791;
+  --blyrics-padding-top: 1.5rem;
+  --blyrics-padding-bottom: 45%;
+}
+#lyrics .blyrics-container {
+  padding-left: 0;
+  padding-right: 0;
+}
+#lyrics .blyrics-line {
+  font-family: inherit;
 }
 
 </style>
