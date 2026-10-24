@@ -1,9 +1,6 @@
 import '@fontsource-variable/inter';
-import '@braccato/core/element';
-import '@braccato/core/styles/variables.css';
-import '@braccato/core/styles/lyrics.css';
-import '@braccato/core/styles/instrumental.css';
-import { TTMLParser } from '@braccato/parsers';
+import { LyricPlayer } from '@applemusic-like-lyrics/core';
+import '@applemusic-like-lyrics/core/style.css';
 
 const $ = id => document.getElementById(id);
 let poller = null;
@@ -11,11 +8,17 @@ let currentTrackId = null;
 let lyricRequestId = 0;
 let lyricLines = [];
 let lyricsAreSynced = false;
-let renderedLyricNodes = [];
-let braccatoLyrics = null;
-let activeLyricIndex = -1;
+let amllPlayer = new LyricPlayer();
+let lastFrameTime = null;
+const lyricHost = $('lyrics');
+lyricHost.appendChild(amllPlayer.getElement());
+amllPlayer.setOptimizeOptions({
+  normalizeSpaces: false,
+  resetLineTimestamps: false,
+  cleanUnintentionalOverlaps: false,
+  tryAdvanceStartTime: false
+});
 let latestProgressMs = 0;
-let latestDurationMs = 0;
 let progressObservedAt = Date.now();
 let isPlaying = false;
 let ambientLayerIndex = 0;
@@ -161,28 +164,14 @@ async function api(path, options={}) {
   if (!response.ok) throw new Error(data.error || 'Request failed ('+response.status+')');
   return data;
 }
-function clearTrack(){
-  $('track').hidden=true;
-  $('cover').style.display='none';
-  $('mobile-progress').hidden=true;
-}
-function formatClock(milliseconds){
-  const seconds=Math.max(0,Math.floor((Number(milliseconds)||0)/1000));
-  return Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');
-}
-function updateMobileProgress(){
-  const duration=latestDurationMs;
-  const progress=Math.min(duration||0,Math.max(0,currentPlaybackSeconds()*1000));
-  $('progress-fill').style.width=(duration?Math.min(100,progress/duration*100):0)+'%';
-  $('progress-current').textContent=formatClock(progress);
-  $('progress-duration').textContent=formatClock(duration);
-}
+function clearTrack(){ $('track').hidden=true; $('cover').style.display='none'; }
 function clearLyrics(){
   lyricLines=[];
-  braccatoLyrics=null;
-  $('lyrics').replaceChildren();
-  renderedLyricNodes = [];
-  activeLyricIndex = -1;
+  if(amllPlayer){
+    amllPlayer.setLyricLines([]);
+    amllPlayer.setCurrentTime(0, true);
+    amllPlayer.pause();
+  }
   $('lyrics-panel').hidden=true;
   $('lyrics-attribution').replaceChildren();
 }
@@ -210,22 +199,6 @@ function setAttribution(source, uploadAttribution){
     addCredit('made by',uploadAttribution.Maker);
   }
 }
-function getBraccatoElement(){
-  if(!braccatoLyrics){
-    braccatoLyrics=document.createElement('braccato-lyrics');
-    braccatoLyrics.setAttribute('aria-label','Synchronized lyrics');
-    braccatoLyrics.style.display='block';
-    braccatoLyrics.style.width='100%';
-    $('lyrics').replaceChildren(braccatoLyrics);
-  }
-  return braccatoLyrics;
-}
-function renderBraccatoLyrics(lines){
-  const element=getBraccatoElement();
-  element.lyrics=lines;
-  element.currentTime=currentPlaybackSeconds();
-  element.playing=isPlaying;
-}
 function renderSpicyLyrics(data){
   clearLyrics();
   $('lyrics-panel').hidden=false;
@@ -249,32 +222,16 @@ function renderSpicyLyrics(data){
   setAttribution(body.source,body.UploadAttribution);
   if(!lyricLines.length){
     $('lyrics-meta').textContent='Spicy Lyrics returned a response, but it contained no renderable lyric lines.';
-    $('lyrics').replaceChildren();
+    amllPlayer.setLyricLines([]);
     return;
   }
   const hasSyllableTiming=lyricLines.some(line=>line.words.some(word=>word.time!==null&&word.endTime!==null));
   $('lyrics-meta').textContent=body.Type==='Syllable'&&hasSyllableTiming
-    ? 'Spicy Lyrics · word-synced lyrics.'
+    ? 'Spicy Lyrics · AMLL syllable-level rendering enabled.'
     : body.Type==='Line'
-      ? 'Spicy Lyrics · line-synced lyrics.'
-      : 'Spicy Lyrics · lyrics loaded.';
-  const braccatoLines=lyricLines.map(line=>{
-    const parts=(line.words||[]).filter(word=>Number.isFinite(word.time)).map(word=>({
-      startTimeMs:word.time*1000,
-      words:word.text,
-      durationMs:Number.isFinite(word.endTime)&&word.endTime>word.time
-        ? (word.endTime-word.time)*1000 : 180,
-    }));
-    const startMs=(Number(line.time)||0)*1000;
-    const lastPartEnd=parts.reduce((max,part)=>Math.max(max,part.startTimeMs+part.durationMs),startMs);
-    return {
-      startTimeMs:startMs,
-      words:line.text,
-      durationMs:Math.max(500,parts.length?lastPartEnd-startMs:3000),
-      ...(parts.length?{parts}:{})
-    };
-  });
-  renderBraccatoLyrics(braccatoLines);
+      ? 'Spicy Lyrics · line-synced lyrics rendered by AMLL.'
+      : 'Spicy Lyrics · lyrics rendered by AMLL.';
+  loadIntoAMLL();
 }
 function timeSeconds(value){
   if(!value) return null;
@@ -301,94 +258,67 @@ function renderLyrics(data){
   clearLyrics();
   $('lyrics-panel').hidden=false;
   setAttribution('lrc.red');
-  let parsed;
-  try {
-    parsed=TTMLParser.parse(data.ttml||'');
-    lyricLines=parsed.map(line=>({
-      time:(Number(line.startTimeMs)||0)/1000,
-      text:line.words||'',
-      words:(line.parts||[]).map(part=>({
-        text:part.words||'',
-        time:Number.isFinite(part.startTimeMs)?part.startTimeMs/1000:null,
-        endTime:Number.isFinite(part.startTimeMs)&&Number.isFinite(part.durationMs)
-          ? (part.startTimeMs+part.durationMs)/1000:null
-      }))
-    }));
-  } catch {
-    lyricLines=parseTtml(data.ttml||'');
-  }
+  lyricLines=parseTtml(data.ttml||'');
   lyricsAreSynced=lyricLines.some(line=>line.words.some(word=>word.time!==null));
   if(!lyricLines.length){
     $('lyrics-meta').textContent='lrc.red returned a TTML file, but it did not contain readable lyric lines.';
     return;
   }
   $('lyrics-meta').textContent=lyricsAreSynced
-    ? 'TTML lyrics loaded · synced highlighting enabled.'
+    ? 'TTML lyrics loaded · AMLL rendering enabled.'
     : 'TTML lyrics loaded · line timing only.';
-  if(parsed) renderBraccatoLyrics(parsed);
-  else renderPlainLyrics();
+  loadIntoAMLL();
 }
-function renderPlainLyrics(){
-  const host = $('lyrics');
-  host.replaceChildren();
-  renderedLyricNodes = lyricLines.map((line, index) => {
-    const row = document.createElement('div');
-    row.className = 'lyric-line';
-    row.dataset.index = String(index);
-    row.dataset.time = String(Number.isFinite(line.time) ? line.time : 0);
-    const words = Array.isArray(line.words) ? line.words : [];
-    if(words.length && words.some(word => Number.isFinite(word.time))){
-      for(const word of words){
-        const span = document.createElement('span');
-        span.className = 'lyric-word';
-        span.textContent = word.text || '';
-        if(Number.isFinite(word.time)) span.dataset.time = String(word.time);
-        if(Number.isFinite(word.endTime)) span.dataset.end = String(word.endTime);
-        else if(Number.isFinite(word.end)) span.dataset.end = String(word.end);
-        row.append(span);
-      }
-    } else {
-      row.textContent = line.text;
+function loadIntoAMLL(){
+  const amllLines=lyricLines.map((line,index)=>{
+    const nextLineTime=lyricLines[index+1]?.time;
+    const lineStart=Math.round((line.time||0)*1000);
+    const words=(line.words||[]).map((word,wordIndex,array)=>{
+      const hasWordTiming=Number.isFinite(word.time);
+      const startTime=hasWordTiming?Math.round(word.time*1000):lineStart;
+      const endSeconds=Number.isFinite(word.endTime)?word.endTime:
+        Number.isFinite(word.end)?word.end:
+        (Number.isFinite(nextLineTime)?nextLineTime:(line.time||0)+2);
+      const text=String(word.text||'');
+      const needsSpace=typeof word.isPartOfWord==='boolean'
+        ? !word.isPartOfWord && wordIndex<array.length-1
+        : false;
+      return {
+        word:text+(needsSpace?' ':''),
+        startTime,
+        endTime:Math.max(startTime+1,Math.round(endSeconds*1000))
+      };
+    });
+    if(!words.length){
+      words.push({
+        word:line.text,
+        startTime:lineStart,
+        endTime:Math.max(lineStart+1,Math.round((Number.isFinite(nextLineTime)?nextLineTime:(line.time||0)+3)*1000))
+      });
     }
-    host.append(row);
-    return row;
+    const startTime=Number.isFinite(lineStart)?lineStart:0;
+    const inferredEnd=Math.max(...words.map(word=>word.endTime),startTime+1);
+    return {
+      words,
+      translatedLyric:'',
+      romanLyric:'',
+      startTime,
+      endTime:Math.max(inferredEnd,Number.isFinite(nextLineTime)?Math.round(nextLineTime*1000):0),
+      isBG:false,
+      isDuet:false
+    };
   });
-  activeLyricIndex = -1;
-  updateActiveLyric();
+  const currentTime=Math.round(currentPlaybackSeconds()*1000);
+  amllPlayer.setLyricLines(amllLines,currentTime);
+  amllPlayer.setCurrentTime(currentTime,true);
+  if(isPlaying) amllPlayer.resume(); else amllPlayer.pause();
 }
 function currentPlaybackSeconds(){
   return latestProgressMs/1000+(isPlaying?(Date.now()-progressObservedAt)/1000:0);
 }
 function updateActiveLyric(){
-  if($('lyrics-panel').hidden) return;
-  if(braccatoLyrics){
-    braccatoLyrics.currentTime=currentPlaybackSeconds();
-    braccatoLyrics.playing=isPlaying;
-    return;
-  }
-  if(!renderedLyricNodes.length) return;
-  const time = currentPlaybackSeconds();
-  let nextIndex = -1;
-  for(let i=0; i<lyricLines.length; i++){
-    if((Number(lyricLines[i].time) || 0) <= time) nextIndex = i;
-    else break;
-  }
-  if(nextIndex < 0) nextIndex = 0;
-  if(nextIndex !== activeLyricIndex){
-    if(activeLyricIndex >= 0) renderedLyricNodes[activeLyricIndex]?.classList.remove('active');
-    activeLyricIndex = nextIndex;
-    const active = renderedLyricNodes[activeLyricIndex];
-    active?.classList.add('active');
-    active?.scrollIntoView({behavior:'smooth',block:'center'});
-  }
-  const activeNode = renderedLyricNodes[activeLyricIndex];
-  if(!activeNode) return;
-  activeNode.querySelectorAll('.lyric-word').forEach(node => {
-    const start = Number(node.dataset.time), end = Number(node.dataset.end);
-    const hasStart = node.dataset.time !== undefined && Number.isFinite(start);
-    const hasEnd = node.dataset.end !== undefined && Number.isFinite(end);
-    node.classList.toggle('active', hasStart && start <= time && (!hasEnd || time < end));
-  });
+  if(!amllPlayer || $('lyrics-panel').hidden) return;
+  amllPlayer.setCurrentTime(Math.round(currentPlaybackSeconds()*1000));
 }
 async function connection(){
   try {
@@ -426,10 +356,12 @@ async function playback(){
     $('playstate').textContent=data.playing ? '▶ Playing' : 'Ⅱ Paused';
     if(data.track.image){ $('cover').src=data.track.image; $('cover').style.display='block'; setAmbientBackground(data.track.image); } else $('cover').style.display='none';
     latestProgressMs=Number(data.progressMs||0);
-    latestDurationMs=Number(data.track.durationMs||0);
-    $('mobile-progress').hidden=!latestDurationMs;
     progressObservedAt=Date.now();
     isPlaying=!!data.playing;
+    if(amllPlayer){
+      amllPlayer.setCurrentTime(Math.round(latestProgressMs),true);
+      if(isPlaying) amllPlayer.resume(); else amllPlayer.pause();
+    }
     if (trackChanged) {
       clearLyrics();
       $('lyrics-panel').hidden = false;
@@ -456,6 +388,7 @@ async function findLyrics({ automatic = false, trackId = currentTrackId } = {}){
   $('lyrics-meta').textContent = automatic
     ? 'New track detected. Asking Spicy Lyrics for the best available sync…'
     : 'Asking Spicy Lyrics for the best available sync…';
+  if (amllPlayer) amllPlayer.setLyricLines([]);
   try {
     const data = await api('/api/lyrics');
     if (requestId !== lyricRequestId || trackId !== currentTrackId) return;
@@ -491,13 +424,17 @@ $('check').onclick=playback;
 $('find-lyrics').onclick=()=>findLyrics();
 $('dynamic-background-toggle').onclick=()=>setDynamicBackgroundEnabled(!dynamicBackgroundEnabled);
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('Disconnected from Spotify.')}catch(e){say('Could not disconnect: '+e.message)}};
-function animatePlayer(){
-  updateActiveLyric();
+function animateAMLL(frameTime){
+  const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
+  lastFrameTime=frameTime;
+  if(amllPlayer){
+    amllPlayer.setCurrentTime(Math.round(currentPlaybackSeconds()*1000));
+    amllPlayer.update(delta);
+  }
   updateBeatPulse();
-  updateMobileProgress();
-  requestAnimationFrame(animatePlayer);
+  requestAnimationFrame(animateAMLL);
 }
-requestAnimationFrame(animatePlayer);
+requestAnimationFrame(animateAMLL);
 const queryError=new URLSearchParams(location.search).get('spotify_error');
 if(queryError) say('Spotify connection error: '+queryError.replaceAll('_',' ')+'. Check the app settings and try again.');
 connection();
