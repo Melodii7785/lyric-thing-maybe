@@ -636,23 +636,57 @@ body > p.muted { margin-top:24px; padding-top:16px; border-top:1px solid #ddd; f
   display: block;
   width: 100%;
   height: 100%;
+  min-height: 0;
   overflow-y: auto;
-  color: inherit;
+  overflow-x: hidden;
+  color: #111;
   background: transparent;
-  --blyrics-font-family: inherit;
-  --blyrics-font-size: clamp(1.15rem, 2.5vw, 1.8rem);
-  --blyrics-line-height: 1.55;
-  --blyrics-active-color: #ff4b76;
-  --blyrics-inactive-color: #8e8791;
-  --blyrics-padding-top: 1.5rem;
-  --blyrics-padding-bottom: 45%;
 }
 #lyrics .blyrics-container {
-  padding-left: 0;
-  padding-right: 0;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 1rem 0 35% !important;
+  --blyrics-font-size: clamp(1.15rem, 2.5vw, 1.65rem);
+  --blyrics-font-weight: 650;
+  --blyrics-line-height: 1.45;
+  --blyrics-lyric-active-color: #e53950;
+  --blyrics-lyric-inactive-color: #777;
+  --blyrics-padding: 1.1rem;
+  --blyrics-margin: 0;
+  --blyrics-scale: 1;
+  --blyrics-active-scale: 1;
+  --blyrics-animate-line-scale: 0;
+  --blyrics-animate-word-wobble: 0;
+  --blyrics-animate-highlight-glow: 0;
+  --blyrics-animate-highlight-swipe: 1;
 }
-#lyrics .blyrics-line {
-  font-family: inherit;
+#lyrics .blyrics-container > div {
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: var(--blyrics-padding) 0 !important;
+  margin: 0 !important;
+  line-height: var(--blyrics-line-height);
+  overflow-wrap: anywhere;
+  transform: none !important;
+}
+#lyrics .blyrics--line {
+  color: var(--blyrics-lyric-inactive-color);
+  font-family: Arial, Helvetica, sans-serif !important;
+  white-space: normal;
+}
+#lyrics .blyrics--active {
+  color: var(--blyrics-lyric-active-color);
+}
+#lyrics .blyrics--word {
+  font-family: inherit !important;
+}
+@media (max-width: 600px) {
+  #lyrics .blyrics-container {
+    --blyrics-font-size: 1.3rem;
+    --blyrics-padding: .9rem;
+    padding-top: .6rem !important;
+    padding-bottom: 40% !important;
+  }
 }
 
 </style>
