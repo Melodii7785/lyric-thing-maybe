@@ -153,7 +153,7 @@ function setDynamicBackgroundEnabled(enabled){
   dynamicBackgroundEnabled = enabled;
   $('dynamic-background').classList.toggle('off', !enabled);
   const button = $('dynamic-background-toggle');
-  button.textContent = 'Dynamic background: ' + (enabled ? 'On' : 'Off');
+  button.textContent = 'fancy background: ' + (enabled ? 'on' : 'off');
   button.setAttribute('aria-pressed', String(enabled));
   if(enabled && ambientImageUrl) void setAmbientBackground(ambientImageUrl, true);
 }
@@ -335,7 +335,7 @@ async function loadDevices(){
   const select=$('spotify-device');
   const status=$('device-status');
   $('connect-controls').hidden=false;
-  status.textContent='Looking for Spotify devices…';
+  status.textContent='looking for your Spotify devices. come out come out wherever you are…';
   try{
     const data=await api('/api/spotify/devices');
     availableDevices=Array.isArray(data.devices)?data.devices:[];
@@ -343,10 +343,10 @@ async function loadDevices(){
     select.replaceChildren();
     if(!availableDevices.length){
       const option=document.createElement('option');
-      option.value=''; option.textContent='No available devices — open Spotify first';
+      option.value=''; option.textContent='no devices found. open Spotify first pls';
       select.append(option);
       selectedDeviceId='';
-      status.textContent='Open Spotify on a phone, computer, console, or speaker, then refresh devices.';
+      status.textContent='open Spotify on your phone/computer/console/whatever and press look again. i believe in you';
       return;
     }
     for(const device of availableDevices){
@@ -361,21 +361,21 @@ async function loadDevices(){
       || availableDevices.find(device=>device.id&&!device.isRestricted);
     if(preferred){select.value=preferred.id;selectedDeviceId=preferred.id;}
     status.textContent=preferred
-      ? 'Connected to '+preferred.name+'. Playback commands require Spotify Premium.'
-      : 'Devices found, but none can currently be controlled.';
+      ? 'found '+preferred.name+'!! we can try controlling it. Spotify Premium is required for playback controls.'
+      : 'devices exist but apparently none of them want to cooperate.';
   }catch(error){
-    status.textContent='Could not load devices: '+error.message;
+    status.textContent='could not find the devices. rude. ('+error.message+')';
   }
 }
 async function playerCommand(action, extra={}){
   const deviceId=selectedDevice();
   if(!deviceId && action!=='shuffle'){
-    $('device-status').textContent='Choose an available Spotify device first.';
+    $('device-status').textContent='pick a device first bestie';
     return;
   }
   const buttons=['previous-track','play-pause','next-track','shuffle-toggle','repeat-toggle','refresh-devices'];
   buttons.forEach(id=>$(id).disabled=true);
-  $('device-status').textContent='Sending command to Spotify…';
+  $('device-status').textContent='asking Spotify nicely…';
   try{
     await api('/api/spotify/player/'+action,{
       method:'POST',
@@ -387,17 +387,17 @@ async function playerCommand(action, extra={}){
       $('shuffle-toggle').setAttribute('aria-pressed',String(shuffleEnabled));
       $('shuffle-toggle').setAttribute('aria-label',shuffleEnabled?'Shuffle on':'Shuffle off');
     }
-    $('device-status').textContent='Command sent. Updating playback…';
+    $('device-status').textContent='sent!! checking if Spotify listened…';
     await playback();
     await loadDevices();
   }catch(error){
     $('device-status').textContent=error.message==='spotify_no_active_device'
-      ? 'Spotify has no active device. Open Spotify on a device and try again.'
+      ? 'Spotify has no active device. open Spotify somewhere and try again pls.'
       : error.message==='spotify_access_denied'
-        ? 'Spotify denied '+action+' (HTTP '+(error.status||403)+')'+(error.details?' · '+error.details:'')+'. Check the active device and current playback context.'
+        ? 'Spotify said NO to '+action+' (HTTP '+(error.status||403)+')'+(error.details?' · '+error.details:'')+'. check the active device/context. why are you like this Spotify.'
         : error.message==='spotify_rate_limited'
-          ? 'Spotify is rate-limiting requests. Wait a moment and try again.'
-          : 'Could not control Spotify: '+error.message;
+          ? 'Spotify is telling us to calm down. wait a sec and try again.'
+          : 'could not control Spotify: '+error.message+' (i am looking at you, Spotify)';
   }finally{
     buttons.forEach(id=>$(id).disabled=false);
   }
@@ -409,9 +409,9 @@ async function connection(){
     $('connect').hidden = data.connected;
     $('find-lyrics').hidden = !data.connected;
     $('disconnect').hidden = !data.connected;
-    if (!data.connected) { $('connect-controls').hidden=true; clearTrack(); clearLyrics(); say('Connect Spotify to detect the track currently playing.'); stopPolling(); }
-    else { say('Connected'+(data.user?.displayName ? ' as '+data.user.displayName : '')+'. Checking playback…'); await loadDevices(); await playback(); startPolling(); }
-  } catch(e){ say('Could not check connection: '+e.message+'\nThe Worker may not be configured yet.'); }
+    if (!data.connected) { $('connect-controls').hidden=true; clearTrack(); clearLyrics(); say('hi!! connect Spotify so i can see what you are playing. i promise to be normal about it'); stopPolling(); }
+    else { say('WE ARE IN'+(data.user?.displayName ? ' as '+data.user.displayName : '')+'!! checking what is playing…'); await loadDevices(); await playback(); startPolling(); }
+  } catch(e){ say('uh oh. connection check failed: '+e.message+'\nthe Worker may be having a moment.'); }
 }
 async function playback(){
   try {
@@ -423,7 +423,7 @@ async function playback(){
         clearLyrics();
       }
       clearTrack();
-      say('Spotify is connected, but nothing is currently playing. Start a track in Spotify and check again.');
+      say('Spotify is connected but it is SILENT in here. play something and come back.');
       return;
     }
     const nextTrackId = data.track.id || `${data.track.title}::${(data.track.artists || []).join(', ')}`;
@@ -458,12 +458,12 @@ async function playback(){
     } else {
       updateActiveLyric();
     }
-    say('Playback detected successfully.');
+    say('PLAYBACK DETECTED. WE ARE SO BACK.');
   } catch(e) {
     clearTrack();
-    if(e.message==='not_connected'||e.message==='spotify_reconnect_required'){ say('Spotify needs to be connected again.'); stopPolling(); $('connection').textContent='not connected'; $('connect').hidden=false; $('find-lyrics').hidden=true; $('disconnect').hidden=true; }
-    else if(e.message==='spotify_access_denied') say('Spotify denied playback access. Check the app permissions in Spotify Developer Dashboard.');
-    else say('Could not read playback: '+e.message);
+    if(e.message==='not_connected'||e.message==='spotify_reconnect_required'){ say('Spotify forgot who we are. reconnect and try again pls.'); stopPolling(); $('connection').textContent='not connected'; $('connect').hidden=false; $('find-lyrics').hidden=true; $('disconnect').hidden=true; }
+    else if(e.message==='spotify_access_denied') say('Spotify said we cannot look at playback. check the app permissions. Spotify please i am begging');
+    else say('i could not read playback: '+e.message+' :(');
   }
 }
 async function findLyrics({ automatic = false, trackId = currentTrackId } = {}){
@@ -474,8 +474,8 @@ async function findLyrics({ automatic = false, trackId = currentTrackId } = {}){
   }
   $('lyrics-panel').hidden = false;
   $('lyrics-meta').textContent = automatic
-    ? 'New track detected. Asking Spicy Lyrics for the best available sync…'
-    : 'Asking Spicy Lyrics for the best available sync…';
+    ? 'NEW SONG!! asking Spicy Lyrics to find the words…'
+    : 'asking Spicy Lyrics for the words. do your thing…';
   if (amllPlayer) amllPlayer.setLyricLines([]);
   try {
     const data = await api('/api/lyrics');
@@ -486,12 +486,12 @@ async function findLyrics({ automatic = false, trackId = currentTrackId } = {}){
     if (requestId !== lyricRequestId || trackId !== currentTrackId) return;
     $('lyrics-panel').hidden = false;
     $('lyrics-meta').textContent = e.message === 'lyrics_not_found'
-      ? 'No synced lyrics found for this track yet.'
+      ? 'no lyrics found for this one yet. devastating. tragic. call the authorities.'
       : e.message === 'nothing_playing'
-        ? 'Start playing a track in Spotify first, then try again.'
+        ? 'play a song on Spotify first and then ask me for the words. i am not a wizard.'
         : e.message === 'lyrics_provider_failed'
-          ? 'The lyrics provider could not return lyrics right now. Try again in a moment.'
-          : 'Could not fetch lyrics: ' + e.message;
+          ? 'the lyrics people are not answering right now. try again in a sec.'
+          : 'could not get the words: ' + e.message+' :(';
   } finally {
     if (requestId === lyricRequestId) {
       $('find-lyrics').disabled = false;
@@ -517,10 +517,10 @@ $('next-track').onclick=()=>playerCommand('next');
 $('shuffle-toggle').onclick=()=>playerCommand('shuffle',{state:!shuffleEnabled});
 $('repeat-toggle').onclick=()=>{const next=repeatState==='off'?'context':repeatState==='context'?'track':'off';playerCommand('repeat',{state:next});};
 $('progress-bar').addEventListener('input',()=>{seekingProgress=true;$('progress-current').textContent=formatTime(Number($('progress-bar').value)/1000*trackDurationMs);});
-$('progress-bar').addEventListener('change',async()=>{const position=Math.round(Number($('progress-bar').value)/1000*trackDurationMs);seekingProgress=false;try{await api('/api/spotify/player/seek',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({position_ms:position,device_id:selectedDevice()||undefined})});latestProgressMs=position;progressObservedAt=Date.now();renderProgress();}catch(error){$('device-status').textContent='Could not seek: '+error.message;await playback();}});
+$('progress-bar').addEventListener('change',async()=>{const position=Math.round(Number($('progress-bar').value)/1000*trackDurationMs);seekingProgress=false;try{await api('/api/spotify/player/seek',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({position_ms:position,device_id:selectedDevice()||undefined})});latestProgressMs=position;progressObservedAt=Date.now();renderProgress();}catch(error){$('device-status').textContent='could not skip to that bit: '+error.message+' :(';await playback();}});
 $('find-lyrics').onclick=()=>findLyrics();
 $('dynamic-background-toggle').onclick=()=>setDynamicBackgroundEnabled(!dynamicBackgroundEnabled);
-$('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('Disconnected from Spotify.')}catch(e){say('Could not disconnect: '+e.message)}};
+$('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('okay bye Spotify. see you later i guess.')}catch(e){say('Spotify would not let me leave. '+e.message)}};
 function animateAMLL(frameTime){
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
   lastFrameTime=frameTime;
@@ -534,5 +534,5 @@ function animateAMLL(frameTime){
 }
 requestAnimationFrame(animateAMLL);
 const queryError=new URLSearchParams(location.search).get('spotify_error');
-if(queryError) say('Spotify connection error: '+queryError.replaceAll('_',' ')+'. Check the app settings and try again.');
+if(queryError) say('Spotify connection error: '+queryError.replaceAll('_',' ')+'. something went wrong. check the app settings pls :(');
 connection();
