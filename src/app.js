@@ -161,7 +161,7 @@ function say(message){ $('status').textContent = message; }
 async function api(path, options={}) {
   const response = await fetch(path, { credentials:'same-origin', cache:'no-store', ...options });
   const data = response.status === 204 ? {} : await response.json().catch(()=>({}));
-  if (!response.ok) throw new Error(data.error || 'Request failed ('+response.status+')');
+  if (!response.ok) { const error = new Error(data.error || 'Request failed ('+response.status+')'); error.details = data.details || ''; error.status = response.status; throw error; }
   return data;
 }
 function clearTrack(){ $('track').hidden=true; $('cover').style.display='none'; }
@@ -380,7 +380,7 @@ async function playerCommand(action, extra={}){
     await api('/api/spotify/player/'+action,{
       method:'POST',
       headers:{'content-type':'application/json'},
-      body:JSON.stringify({...extra,device_id:deviceId||undefined})
+      body:JSON.stringify({...extra,device_id:['previous','next'].includes(action)?undefined:(deviceId||undefined)})
     });
     if(action==='shuffle'){
       shuffleEnabled=!!extra.state;
@@ -394,7 +394,7 @@ async function playerCommand(action, extra={}){
     $('device-status').textContent=error.message==='spotify_no_active_device'
       ? 'Spotify has no active device. Open Spotify on a device and try again.'
       : error.message==='spotify_access_denied'
-        ? 'Spotify denied playback control. Reconnect and approve playback permissions.'
+        ? 'Spotify denied '+action+' (HTTP '+(error.status||403)+')'+(error.details?' · '+error.details:'')+'. Check the active device and current playback context.'
         : error.message==='spotify_rate_limited'
           ? 'Spotify is rate-limiting requests. Wait a moment and try again.'
           : 'Could not control Spotify: '+error.message;
