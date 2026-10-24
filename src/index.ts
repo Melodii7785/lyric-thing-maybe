@@ -210,6 +210,8 @@ async function handle(request: Request, env: Env): Promise<Response> {
       previous: { method: "POST", endpoint: "/me/player/previous" },
       transfer: { method: "PUT", endpoint: "/me/player" },
       shuffle: { method: "PUT", endpoint: "/me/player/shuffle" },
+      repeat: { method: "PUT", endpoint: "/me/player/repeat" },
+      seek: { method: "PUT", endpoint: "/me/player/seek" },
     };
     const command = allowed[action];
     if (!command) return json({ error: "unsupported_player_action" }, 404);
@@ -230,12 +232,24 @@ async function handle(request: Request, env: Env): Promise<Response> {
     } else if (action === "shuffle") {
       apiUrl.searchParams.set("state", String(!!body.state));
       if (typeof body.device_id === "string" && body.device_id) apiUrl.searchParams.set("device_id", body.device_id);
+    } else if (action === "repeat") {
+      if (!["off", "context", "track"].includes(body.state)) return json({ error: "invalid_repeat_state" }, 400);
+      apiUrl.searchParams.set("state", body.state);
+      if (typeof body.device_id === "string" && body.device_id) apiUrl.searchParams.set("device_id", body.device_id);
+    } else if (action === "seek") {
+      const position = Number(body.position_ms);
+      if (!Number.isFinite(position) || position < 0) return json({ error: "invalid_seek_position" }, 400);
+      apiUrl.searchParams.set("position_ms", String(Math.floor(position)));
+      if (typeof body.device_id === "string" && body.device_id) apiUrl.searchParams.set("device_id", body.device_id);
     } else if (["play", "pause", "next", "previous"].includes(action) && typeof body.device_id === "string" && body.device_id) {
       apiUrl.searchParams.set("device_id", body.device_id);
     }
     const response = await fetch(apiUrl.toString(), { method: command.method, headers, body: requestBody });
     if (response.status === 401) return json({ error: "spotify_reconnect_required" }, 401);
-    if (response.status === 403) return json({ error: "spotify_access_denied" }, 403);
+    if (response.status === 403) {
+      const details = await response.text().catch(() => "");
+      return json({ error: "spotify_access_denied", action, details: details.slice(0, 500) }, 403);
+    }
     if (response.status === 404) return json({ error: "spotify_no_active_device" }, 404);
     if (response.status === 429) return json({ error: "spotify_rate_limited" }, 429);
     if (!response.ok) return json({ error: "spotify_command_failed", status: response.status }, 502);
@@ -257,7 +271,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const data = await response.json() as any;
     if (!data?.item) return json({ playing: false, track: null });
     const track = data.item;
-    return json({ playing: !!data.is_playing, progressMs: data.progress_ms ?? null, track: {
+    return json({ playing: !!data.is_playing, progressMs: data.progress_ms ?? null, repeatState: data.repeat_state ?? "off", shuffleState: !!data.shuffle_state, track: {
       id: track.id ?? null, title: track.name ?? "Unknown track",
       artists: Array.isArray(track.artists) ? track.artists.map((a: any) => a.name).filter(Boolean) : [],
       album: track.album?.name ?? null, image: track.album?.images?.[0]?.url ?? null,
