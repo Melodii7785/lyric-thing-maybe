@@ -179,6 +179,7 @@ function updateMobileProgress(){
 }
 function clearLyrics(){
   lyricLines=[];
+  braccatoLyrics=null;
   $('lyrics').replaceChildren();
   renderedLyricNodes = [];
   activeLyricIndex = -1;
