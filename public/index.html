@@ -39,6 +39,22 @@ button:disabled{opacity:.5;cursor:wait}
 a{color:#d9273f}
 button:focus-visible,a:focus-visible{outline:2px solid #d9273f;outline-offset:3px}
 @media(max-width:600px){body{padding:18px 16px}.track{gap:12px;padding:12px 0}#cover{width:64px;height:64px}.actions button{flex:1 1 auto}#lyrics{height:55vh;max-height:65vh}}
+
+/* Lyrics contrast: unsung lines grey, currently sung line red. */
+#lyrics .amll-lyric-player {
+  --amll-lp-color: #777 !important;
+  --amll-lp-highlight-color: #d9273f !important;
+  color: #777 !important;
+}
+#lyrics .amll-lyric-player [class*="active"],
+#lyrics .amll-lyric-player [class*="highlight"],
+#lyrics .amll-lyric-player [class*="current"] {
+  color: #d9273f !important;
+}
+#lyrics .amll-lyric-player [style*="color: rgb(255, 255, 255)"],
+#lyrics .amll-lyric-player [style*="color: rgb(255,255,255)"] {
+  color: #d9273f !important;
+}
 </style>
 </head>
 <body>
