@@ -229,7 +229,7 @@ function renderSpicyLyrics(data){
   $('lyrics-meta').textContent=body.Type==='Syllable'&&hasSyllableTiming
     ? 'we did it evergbkdy. the lyrics are SYLLABLE SYNCed. three cheers for tecknologi!!.'
     : body.Type==='Line'
-      ? 'i guess this works idk. it's like spotify but best we got for this song'
+      ? 'i guess this works idk. its like spotify but best we got for this song'
       : 'vat ze fuck is zhis bro. regular lyriks? i asked for ze FANCI lyriks';
   loadIntoAMLL();
 }
