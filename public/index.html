@@ -38,6 +38,11 @@ button:disabled{opacity:.5;cursor:wait}
 #lyrics-attribution{margin-top:18px;padding-top:12px;border-top:1px solid #ccc;font-size:.78rem;line-height:1.7;color:#777}
 a{color:#d9273f}
 button:focus-visible,a:focus-visible{outline:2px solid #d9273f;outline-offset:3px}
+.device-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:18px 0 10px}
+.device-row label{font-size:.82rem;color:#aaa;font-weight:700}
+.device-row select{flex:1 1 180px;min-width:0;padding:10px;background:#222;color:#eee;border:1px solid #555;border-radius:0;font:inherit}
+.playback-actions{margin:10px 0}
+#device-status{margin:6px 0 14px;color:#aaa}
 @media(max-width:600px){body{padding:18px 16px}.track{gap:12px;padding:12px 0}#cover{width:64px;height:64px}.actions button{flex:1 1 auto}#lyrics{height:55vh;max-height:65vh}}
 
 /* Lyrics contrast: unsung lines grey, currently sung line red. */
@@ -89,6 +94,20 @@ button.secondary{background:transparent;color:#eee;border-color:#666}
     <button class="secondary" id="find-lyrics" hidden>Find lyrics</button>
     <button class="secondary" id="disconnect">Disconnect</button>
     <button class="secondary" id="dynamic-background-toggle" aria-pressed="true">Dynamic background: On</button>
+  </div>
+  <div id="connect-controls" hidden>
+    <div class="device-row">
+      <label for="spotify-device">Playback device</label>
+      <select id="spotify-device" aria-label="Spotify playback device"></select>
+      <button class="secondary" id="refresh-devices" type="button">Refresh devices</button>
+    </div>
+    <div class="actions playback-actions">
+      <button class="secondary" id="previous-track" type="button">Previous</button>
+      <button id="play-pause" type="button">Play / pause</button>
+      <button class="secondary" id="next-track" type="button">Next</button>
+      <button class="secondary" id="shuffle-toggle" type="button" aria-pressed="false">Shuffle: Off</button>
+    </div>
+    <p class="muted" id="device-status">Select a Spotify device to control playback.</p>
   </div>
   <div id="status" role="status" aria-live="polite">Checking connection…</div>
   <div class="track" id="track" hidden>
