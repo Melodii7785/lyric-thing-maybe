@@ -126,7 +126,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     authorize.search = new URLSearchParams({
       response_type: "code", client_id: env.CLIENT_ID,
       redirect_uri: env.SPOTIFY_REDIRECT_URI,
-      scope: "user-read-playback-state user-read-currently-playing", state,
+      scope: "user-read-playback-state user-read-currently-playing user-modify-playback-state", state,
     }).toString();
     return Response.redirect(authorize.toString(), 302);
   }
@@ -173,6 +173,73 @@ async function handle(request: Request, env: Env): Promise<Response> {
   if (path === "/api/session" && request.method === "GET") {
     const session = await getSession(request, env);
     return json({ connected: !!session, user: session ? { displayName: session.display_name } : null });
+  }
+  if (path === "/api/spotify/devices" && request.method === "GET") {
+    let session = await getSession(request, env);
+    if (!session) return json({ error: "not_connected" }, 401);
+    try { session = await refresh(session, env); }
+    catch {
+      await env.DB.prepare("DELETE FROM sessions WHERE session_hash = ?").bind(session.session_hash).run();
+      return json({ error: "spotify_reconnect_required" }, 401);
+    }
+    const response = await fetch(API_URL + "/me/player/devices", {
+      headers: { authorization: "Bearer " + await decrypt(env, session.access_token_enc), accept: "application/json" },
+    });
+    if (response.status === 401) return json({ error: "spotify_reconnect_required" }, 401);
+    if (!response.ok) return json({ error: response.status === 403 ? "spotify_access_denied" : "spotify_devices_failed" }, response.status === 403 ? 403 : 502);
+    const data = await response.json() as any;
+    return json({ devices: Array.isArray(data.devices) ? data.devices.map((device: any) => ({
+      id: device.id ?? null, name: device.name ?? "Spotify device", type: device.type ?? "unknown",
+      isActive: !!device.is_active, isRestricted: !!device.is_restricted,
+      volumePercent: device.volume_percent ?? null, supportsVolume: !!device.supports_volume,
+    })) : [] });
+  }
+  if (path.startsWith("/api/spotify/player/") && request.method === "POST") {
+    let session = await getSession(request, env);
+    if (!session) return json({ error: "not_connected" }, 401);
+    try { session = await refresh(session, env); }
+    catch {
+      await env.DB.prepare("DELETE FROM sessions WHERE session_hash = ?").bind(session.session_hash).run();
+      return json({ error: "spotify_reconnect_required" }, 401);
+    }
+    const action = path.slice("/api/spotify/player/".length);
+    const allowed: Record<string, { method: string; endpoint: string }> = {
+      play: { method: "PUT", endpoint: "/me/player/play" },
+      pause: { method: "PUT", endpoint: "/me/player/pause" },
+      next: { method: "POST", endpoint: "/me/player/next" },
+      previous: { method: "POST", endpoint: "/me/player/previous" },
+      transfer: { method: "PUT", endpoint: "/me/player" },
+      shuffle: { method: "PUT", endpoint: "/me/player/shuffle" },
+    };
+    const command = allowed[action];
+    if (!command) return json({ error: "unsupported_player_action" }, 404);
+    let body: any = {};
+    if (request.method === "POST") {
+      try { body = await request.json(); } catch { body = {}; }
+    }
+    const apiUrl = new URL(API_URL + command.endpoint);
+    const headers: Record<string, string> = {
+      authorization: "Bearer " + await decrypt(env, session.access_token_enc),
+      accept: "application/json",
+    };
+    let requestBody: string | undefined;
+    if (action === "transfer") {
+      if (typeof body.device_id !== "string" || !body.device_id) return json({ error: "device_required" }, 400);
+      requestBody = JSON.stringify({ device_ids: [body.device_id], play: body.play !== false });
+      headers["content-type"] = "application/json";
+    } else if (action === "shuffle") {
+      apiUrl.searchParams.set("state", String(!!body.state));
+      if (typeof body.device_id === "string" && body.device_id) apiUrl.searchParams.set("device_id", body.device_id);
+    } else if (["play", "pause", "next", "previous"].includes(action) && typeof body.device_id === "string" && body.device_id) {
+      apiUrl.searchParams.set("device_id", body.device_id);
+    }
+    const response = await fetch(apiUrl.toString(), { method: command.method, headers, body: requestBody });
+    if (response.status === 401) return json({ error: "spotify_reconnect_required" }, 401);
+    if (response.status === 403) return json({ error: "spotify_access_denied" }, 403);
+    if (response.status === 404) return json({ error: "spotify_no_active_device" }, 404);
+    if (response.status === 429) return json({ error: "spotify_rate_limited" }, 429);
+    if (!response.ok) return json({ error: "spotify_command_failed", status: response.status }, 502);
+    return json({ ok: true });
   }
   if (path === "/api/spotify/playback" && request.method === "GET") {
     let session = await getSession(request, env);
