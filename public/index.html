@@ -8,77 +8,143 @@
 <title>lyric thing™</title>
 <link rel="stylesheet" href="/amll.css">
 <style>
-:root{color-scheme:dark;font-family:Arial,Helvetica,sans-serif;background:#111;color:#eee}
+@font-face{
+  font-family:"Roboto Flex";
+  src:url("https://raw.githubusercontent.com/google/fonts/main/ofl/robotoflex/RobotoFlex%5BGRAD%2CXOPQ%2CXTRA%2CYTAS%2CYTDE%2CYTLC%2CYTUC%2Copsz%2Cslnt%2Cwdth%2Cwght%5D.ttf") format("truetype");
+  font-style:normal;
+  font-weight:100 1000;
+  font-display:swap;
+}
+:root{
+  color-scheme:dark;
+  font-family:"Roboto Flex",Inter,Arial,Helvetica,sans-serif;
+  background:#111;
+  color:#eee;
+  --bg:#111;
+  --surface:#181818;
+  --line:#383838;
+  --text:#eee;
+  --muted:#aaa;
+  --dim:#777;
+  --accent:#d9273f;
+  --accent-hot:#ff4058;
+}
 *{box-sizing:border-box}
-body{margin:0 auto;max-width:980px;padding:24px clamp(16px,4vw,42px);background:#111;min-height:100vh;color:#eee}
+html{background:var(--bg);scrollbar-color:#444 var(--bg)}
+body{
+  margin:0 auto;
+  max-width:980px;
+  min-height:100vh;
+  padding:clamp(20px,4vw,42px);
+  background:var(--bg);
+  color:var(--text);
+  font-family:inherit;
+  font-size:16px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
 #dynamic-background{display:none}
-.eyebrow{color:#d9273f;font-size:.75rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
-h1{margin:12px 0 18px;font-size:clamp(2.6rem,8vw,5.5rem);line-height:.95;letter-spacing:-.07em;color:#d8d8d8}
-body>p{color:#777;line-height:1.55}
-.panel{margin-top:24px;padding:0;background:transparent;border:0;border-radius:0;box-shadow:none}
+.eyebrow{
+  color:var(--accent-hot);
+  font-size:.75rem;
+  font-weight:800;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+h1{
+  margin:12px 0 18px;
+  font-size:clamp(2.6rem,8vw,5.5rem);
+  line-height:.95;
+  letter-spacing:-.065em;
+  font-weight:850;
+  color:#e5e5e5;
+}
+body>p{color:var(--muted);line-height:1.65}
+.panel{margin-top:26px;padding:0;background:transparent;border:0;border-radius:0;box-shadow:none}
 .actions{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
-button{padding:10px 15px;border:1px solid #222;border-radius:0;background:#d9273f;color:#fff;font:inherit;font-weight:700;cursor:pointer}
-button:hover{filter:brightness(.94)}
-button.secondary{background:transparent;color:#222;border-color:#aaa}
+button{
+  min-height:42px;
+  padding:10px 15px;
+  border:1px solid var(--accent);
+  border-radius:0;
+  background:var(--accent);
+  color:#fff;
+  font:inherit;
+  font-weight:750;
+  cursor:pointer;
+  transition:background-color .15s ease,border-color .15s ease,filter .15s ease;
+}
+button:hover{filter:brightness(1.12)}
+button:active{filter:brightness(.9)}
+button.secondary{background:transparent;color:var(--text);border-color:#555}
+button.secondary:hover{border-color:var(--accent-hot);color:#fff}
 button:disabled{opacity:.5;cursor:wait}
-#status{margin:16px 0;color:#555;font-size:.9rem;white-space:pre-wrap;overflow-wrap:anywhere}
-.pill{display:inline-block;padding:4px 0;border:0;border-bottom:2px solid #d9273f;border-radius:0;color:#222;font-size:.78rem;font-weight:700;text-transform:uppercase}
-.track{display:flex;align-items:center;gap:14px;margin-top:18px;padding:14px 0;border-radius:0;background:transparent;border-top:1px solid #bbb;border-bottom:1px solid #bbb}
+#status{margin:16px 0;color:var(--muted);font-size:.9rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.pill{
+  display:inline-block;
+  padding:4px 0;
+  border:0;
+  border-bottom:2px solid var(--accent);
+  border-radius:0;
+  color:var(--text);
+  font-size:.78rem;
+  font-weight:800;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.track{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin-top:18px;
+  padding:14px 0;
+  border-radius:0;
+  background:transparent;
+  border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+}
 .track>div{min-width:0}
-#cover{display:none;width:72px;height:72px;object-fit:cover;border-radius:0;background:#ddd;box-shadow:none}
-.track h2{margin:0 0 5px;font-size:1.2rem;overflow-wrap:anywhere;color:#171717}
-.track p{margin:0;color:#666;line-height:1.45}
-.muted{color:#777;font-size:.82rem}
-#lyrics-panel{margin-top:26px;padding-top:18px;border-top:3px solid #171717}
-#lyrics-panel h2{margin:0;font-size:1.5rem;letter-spacing:-.04em;color:#d6d6d6}
-#lyrics{position:relative;height:clamp(320px,58vh,680px);max-height:68vh;margin-top:18px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:4px 0}
-#lyrics .amll-lyric-player{width:100%;height:100%;background:transparent;color:#171717;font-family:Arial,Helvetica,sans-serif!important;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+#cover{display:none;width:72px;height:72px;object-fit:cover;border-radius:0;background:#222;box-shadow:none}
+.track h2{margin:0 0 5px;font-size:1.2rem;line-height:1.25;overflow-wrap:anywhere;color:#f1f1f1}
+.track p{margin:0;color:var(--muted);line-height:1.45}
+.muted{color:var(--muted);font-size:.82rem}
+#lyrics-panel{margin-top:28px;padding-top:20px;border-top:3px solid #eee}
+#lyrics-panel h2{margin:0;font-size:1.5rem;letter-spacing:-.04em;line-height:1.2;color:#e5e5e5}
+#lyrics{position:relative;height:clamp(320px,58vh,680px);max-height:68vh;margin-top:18px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:4px 0;scrollbar-color:#444 transparent;scrollbar-width:thin}
+#lyrics .amll-lyric-player{width:100%;height:100%;background:transparent;color:#777;font-family:"Roboto Flex",Inter,Arial,Helvetica,sans-serif!important;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 #lyrics .amll-lyric-player *{font-family:inherit!important}
-#lyrics-meta{color:#777;font-size:.8rem}
-#lyrics-attribution{margin-top:18px;padding-top:12px;border-top:1px solid #ccc;font-size:.78rem;line-height:1.7;color:#777}
-a{color:#d9273f}
-button:focus-visible,a:focus-visible{outline:2px solid #d9273f;outline-offset:3px}
-.device-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:18px 0 10px}
-.device-row label{font-size:.82rem;color:#aaa;font-weight:700}
-.device-row select{flex:1 1 180px;min-width:0;padding:10px;background:#222;color:#eee;border:1px solid #555;border-radius:0;font:inherit}
-.playback-actions{display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0}.playback-actions button{width:42px;height:42px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:1.2rem;line-height:1}.playback-actions svg{width:21px;height:21px;display:block}.playback-actions #play-pause svg{width:24px;height:24px}.playback-actions #play-pause{width:48px;height:48px;font-size:1.45rem}.playback-actions button[aria-pressed="true"]{background:#d9273f;color:#fff;border-color:#d9273f}.progress-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;margin-top:10px;color:#aaa;font-size:.75rem;font-variant-numeric:tabular-nums}#progress-bar{width:100%;accent-color:#d9273f;cursor:pointer}#progress-bar:disabled{opacity:.45;cursor:default}
-#device-status{margin:6px 0 14px;color:#aaa}
-@media(max-width:600px){body{padding:18px 16px}.track{gap:12px;padding:12px 0}#cover{width:64px;height:64px}.actions button{flex:1 1 auto}#lyrics{height:55vh;max-height:65vh}}
-
-/* Lyrics contrast: unsung lines grey, currently sung line red. */
-#lyrics .amll-lyric-player {
-  --amll-lp-color: #777 !important;
-  --amll-lp-highlight-color: #d9273f !important;
-  color: #777 !important;
-}
+#lyrics .amll-lyric-player{--amll-lp-color:#777!important;--amll-lp-highlight-color:var(--accent-hot)!important;color:#777!important}
 #lyrics .amll-lyric-player [class*="active"],
 #lyrics .amll-lyric-player [class*="highlight"],
-#lyrics .amll-lyric-player [class*="current"] {
-  color: #d9273f !important;
-}
+#lyrics .amll-lyric-player [class*="current"],
 #lyrics .amll-lyric-player [style*="color: rgb(255, 255, 255)"],
-#lyrics .amll-lyric-player [style*="color: rgb(255,255,255)"] {
-  color: #d9273f !important;
+#lyrics .amll-lyric-player [style*="color: rgb(255,255,255)"]{color:var(--accent-hot)!important}
+#lyrics-meta{color:var(--muted);font-size:.8rem}
+#lyrics-attribution{margin-top:18px;padding-top:12px;border-top:1px solid #444;font-size:.78rem;line-height:1.7;color:var(--muted)}
+a{color:var(--accent-hot)}
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent-hot);outline-offset:3px}
+.device-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:18px 0 10px}
+.device-row label{font-size:.82rem;color:var(--muted);font-weight:750}
+.device-row select{flex:1 1 180px;min-width:0;min-height:42px;padding:10px;background:#1b1b1b;color:var(--text);border:1px solid #555;border-radius:0;font:inherit}
+.playback-actions{display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0}
+.playback-actions button{width:42px;height:42px;min-height:42px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:1.2rem;line-height:1}
+.playback-actions svg{width:21px;height:21px;display:block}
+.playback-actions #play-pause svg{width:24px;height:24px}
+.playback-actions #play-pause{width:48px;height:48px;font-size:1.45rem}
+.playback-actions button[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.progress-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;margin-top:10px;color:var(--muted);font-size:.75rem;font-variant-numeric:tabular-nums}
+#progress-bar{width:100%;accent-color:var(--accent);cursor:pointer}
+#progress-bar:disabled{opacity:.45;cursor:default}
+#device-status{margin:6px 0 14px;color:var(--muted)}
+@media(max-width:600px){
+  body{padding:22px 16px}
+  .track{gap:12px;padding:12px 0}
+  #cover{width:64px;height:64px}
+  .actions button{flex:1 1 auto}
+  #lyrics{height:55vh;max-height:65vh}
 }
-
-/* Dark mode: keep the existing layout, just switch the palette. */
-:root{color-scheme:dark;background:#111;color:#eee}
-body{background:#111;color:#eee}
-body>p{color:#aaa}
-h1,#lyrics-panel h2{color:#555}
-.track{border-color:#444}
-.track h2{color:#f1f1f1}
-.track p,.muted,#lyrics-meta,#lyrics-attribution{color:#aaa}
-button{border-color:#d9273f;background:#d9273f;color:#fff}
-button.secondary{background:transparent;color:#eee;border-color:#666}
-.pill{color:#eee}
-#lyrics-panel{border-top-color:#eee}
-#lyrics-attribution{border-top-color:#444}
-#cover{background:#222}
-#lyrics .amll-lyric-player{background:transparent;color:#ddd}
-#lyrics .amll-lyric-player [class*="active"],
-#lyrics .amll-lyric-player [class*="highlight"],
-#lyrics .amll-lyric-player [class*="current"]{color:#ff4058!important}
+@media(prefers-reduced-motion:reduce){button{transition:none}}
 </style>
 </head>
 <body>
