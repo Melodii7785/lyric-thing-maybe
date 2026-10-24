@@ -323,6 +323,11 @@ function updateActiveLyric(){
 let availableDevices = [];
 let selectedDeviceId = '';
 let shuffleEnabled = false;
+let repeatState = 'off';
+let trackDurationMs = 0;
+let seekingProgress = false;
+function formatTime(ms){const s=Math.max(0,Math.floor((Number(ms)||0)/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+function renderProgress(){const bar=$('progress-bar');if(!bar)return;const p=Math.min(trackDurationMs,Math.max(0,currentPlaybackSeconds()*1000));if(!seekingProgress)bar.value=trackDurationMs?String(Math.round(p/trackDurationMs*1000)):'0';bar.disabled=!trackDurationMs;$('progress-current').textContent=formatTime(p);$('progress-duration').textContent=formatTime(trackDurationMs);}
 function selectedDevice(){
   return $('spotify-device').value || selectedDeviceId || '';
 }
@@ -368,7 +373,7 @@ async function playerCommand(action, extra={}){
     $('device-status').textContent='Choose an available Spotify device first.';
     return;
   }
-  const buttons=['previous-track','play-pause','next-track','shuffle-toggle','refresh-devices'];
+  const buttons=['previous-track','play-pause','next-track','shuffle-toggle','repeat-toggle','refresh-devices'];
   buttons.forEach(id=>$(id).disabled=true);
   $('device-status').textContent='Sending command to Spotify…';
   try{
@@ -379,8 +384,8 @@ async function playerCommand(action, extra={}){
     });
     if(action==='shuffle'){
       shuffleEnabled=!!extra.state;
-      $('shuffle-toggle').textContent='Shuffle: '+(shuffleEnabled?'On':'Off');
       $('shuffle-toggle').setAttribute('aria-pressed',String(shuffleEnabled));
+      $('shuffle-toggle').setAttribute('aria-label',shuffleEnabled?'Shuffle on':'Shuffle off');
     }
     $('device-status').textContent='Command sent. Updating playback…';
     await playback();
@@ -430,10 +435,16 @@ async function playback(){
     $('title').textContent=data.track.title;
     $('artist').textContent=(data.track.artists||[]).join(', ') || 'Unknown artist';
     $('album').textContent=data.track.album || '';
-    $('playstate').textContent=data.playing ? '▶ Playing' : 'Ⅱ Paused';
+    $('playstate').textContent=data.playing ? 'Playing' : 'Paused';
+    $('play-pause').innerHTML=data.playing?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM15 5h3v14h-3z" fill="currentColor"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>';
+    $('play-pause').setAttribute('aria-label',data.playing?'Pause':'Play');
     if(data.track.image){ $('cover').src=data.track.image; $('cover').style.display='block'; setAmbientBackground(data.track.image); } else $('cover').style.display='none';
     latestProgressMs=Number(data.progressMs||0);
+    trackDurationMs=Number(data.track.durationMs||0);
     progressObservedAt=Date.now();
+    if(typeof data.shuffleState==='boolean'){shuffleEnabled=data.shuffleState;$('shuffle-toggle').setAttribute('aria-pressed',String(shuffleEnabled));}
+    if(['off','context','track'].includes(data.repeatState)){repeatState=data.repeatState;$('repeat-toggle').setAttribute('aria-pressed',String(repeatState!=='off'));$('repeat-toggle').setAttribute('aria-label','Repeat '+repeatState);$('repeat-toggle').title='Repeat '+repeatState;}
+    renderProgress();
     isPlaying=!!data.playing;
     if(amllPlayer){
       amllPlayer.setCurrentTime(Math.round(latestProgressMs),true);
@@ -504,6 +515,9 @@ $('play-pause').onclick=()=>playerCommand(isPlaying?'pause':'play');
 $('previous-track').onclick=()=>playerCommand('previous');
 $('next-track').onclick=()=>playerCommand('next');
 $('shuffle-toggle').onclick=()=>playerCommand('shuffle',{state:!shuffleEnabled});
+$('repeat-toggle').onclick=()=>{const next=repeatState==='off'?'context':repeatState==='context'?'track':'off';playerCommand('repeat',{state:next});};
+$('progress-bar').addEventListener('input',()=>{seekingProgress=true;$('progress-current').textContent=formatTime(Number($('progress-bar').value)/1000*trackDurationMs);});
+$('progress-bar').addEventListener('change',async()=>{const position=Math.round(Number($('progress-bar').value)/1000*trackDurationMs);seekingProgress=false;try{await api('/api/spotify/player/seek',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({position_ms:position,device_id:selectedDevice()||undefined})});latestProgressMs=position;progressObservedAt=Date.now();renderProgress();}catch(error){$('device-status').textContent='Could not seek: '+error.message;await playback();}});
 $('find-lyrics').onclick=()=>findLyrics();
 $('dynamic-background-toggle').onclick=()=>setDynamicBackgroundEnabled(!dynamicBackgroundEnabled);
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('Disconnected from Spotify.')}catch(e){say('Could not disconnect: '+e.message)}};
@@ -512,6 +526,7 @@ function animateAMLL(frameTime){
   lastFrameTime=frameTime;
   if(amllPlayer){
     amllPlayer.setCurrentTime(Math.round(currentPlaybackSeconds()*1000));
+    renderProgress();
     amllPlayer.update(delta);
   }
   updateBeatPulse();
