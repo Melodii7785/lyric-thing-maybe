@@ -16,6 +16,7 @@
     "vite": "^7.1.12"
   },
   "dependencies": {
+    "@applemusic-like-lyrics/core": "^0.6.0",
     "@pixi/app": "^7.4.3",
     "@pixi/core": "^7.4.3",
     "@pixi/display": "^7.4.3",
@@ -25,8 +26,6 @@
     "@pixi/sprite": "^7.4.3",
     "jss": "^10.10.0",
     "jss-preset-default": "^10.10.0",
-    "@fontsource-variable/inter": "^5.2.8",
-    "@braccato/core": "^1.16.13",
-    "@braccato/parsers": "^0.4.0"
+    "@fontsource-variable/inter": "^5.2.8"
   }
 }
