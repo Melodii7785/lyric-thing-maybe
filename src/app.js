@@ -1,4 +1,5 @@
 import '@fontsource-variable/inter';
+// Keep the verified app.js fix on a fresh commit so CI can run again.
 import { LyricPlayer } from '@applemusic-like-lyrics/core';
 import '@applemusic-like-lyrics/core/style.css';
 
