@@ -229,8 +229,8 @@ function renderSpicyLyrics(data){
   $('lyrics-meta').textContent=body.Type==='Syllable'&&hasSyllableTiming
     ? 'SPICY LYRICS BROUGHT THE WORDS and AMLL is doing the little karaoke dance. look at them go.'
     : body.Type==='Line'
-      ? 'the words are synced to the song!! AMLL is keeping up. somehow.'
-      : 'here are the words. AMLL put them on the screen. we did it everybody.';
+      ? 'i guess this works idk'
+      : 'vat ze fuck is zhis bro. regular lyriks? i asked for ze FANCI lyriks';
   loadIntoAMLL();
 }
 function timeSeconds(value){
