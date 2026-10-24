@@ -227,10 +227,10 @@ function renderSpicyLyrics(data){
   }
   const hasSyllableTiming=lyricLines.some(line=>line.words.some(word=>word.time!==null&&word.endTime!==null));
   $('lyrics-meta').textContent=body.Type==='Syllable'&&hasSyllableTiming
-    ? 'Spicy Lyrics · AMLL syllable-level rendering enabled.'
+    ? 'SPICY LYRICS BROUGHT THE WORDS and AMLL is doing the little karaoke dance. look at them go.'
     : body.Type==='Line'
-      ? 'Spicy Lyrics · line-synced lyrics rendered by AMLL.'
-      : 'Spicy Lyrics · lyrics rendered by AMLL.';
+      ? 'the words are synced to the song!! AMLL is keeping up. somehow.'
+      : 'here are the words. AMLL put them on the screen. we did it everybody.';
   loadIntoAMLL();
 }
 function timeSeconds(value){
