@@ -320,6 +320,83 @@ function updateActiveLyric(){
   if(!amllPlayer || $('lyrics-panel').hidden) return;
   amllPlayer.setCurrentTime(Math.round(currentPlaybackSeconds()*1000));
 }
+let availableDevices = [];
+let selectedDeviceId = '';
+let shuffleEnabled = false;
+function selectedDevice(){
+  return $('spotify-device').value || selectedDeviceId || '';
+}
+async function loadDevices(){
+  const select=$('spotify-device');
+  const status=$('device-status');
+  $('connect-controls').hidden=false;
+  status.textContent='Looking for Spotify devices…';
+  try{
+    const data=await api('/api/spotify/devices');
+    availableDevices=Array.isArray(data.devices)?data.devices:[];
+    const previous=select.value || selectedDeviceId;
+    select.replaceChildren();
+    if(!availableDevices.length){
+      const option=document.createElement('option');
+      option.value=''; option.textContent='No available devices — open Spotify first';
+      select.append(option);
+      selectedDeviceId='';
+      status.textContent='Open Spotify on a phone, computer, console, or speaker, then refresh devices.';
+      return;
+    }
+    for(const device of availableDevices){
+      const option=document.createElement('option');
+      option.value=device.id || '';
+      option.textContent=device.name+(device.isActive?' · Active':'')+(device.isRestricted?' · Unavailable':'');
+      option.disabled=!device.id || device.isRestricted;
+      select.append(option);
+    }
+    const preferred=availableDevices.find(device=>device.id===previous&&!device.isRestricted)
+      || availableDevices.find(device=>device.isActive&&!device.isRestricted)
+      || availableDevices.find(device=>device.id&&!device.isRestricted);
+    if(preferred){select.value=preferred.id;selectedDeviceId=preferred.id;}
+    status.textContent=preferred
+      ? 'Connected to '+preferred.name+'. Playback commands require Spotify Premium.'
+      : 'Devices found, but none can currently be controlled.';
+  }catch(error){
+    status.textContent='Could not load devices: '+error.message;
+  }
+}
+async function playerCommand(action, extra={}){
+  const deviceId=selectedDevice();
+  if(!deviceId && action!=='shuffle'){
+    $('device-status').textContent='Choose an available Spotify device first.';
+    return;
+  }
+  const buttons=['previous-track','play-pause','next-track','shuffle-toggle','refresh-devices'];
+  buttons.forEach(id=>$(id).disabled=true);
+  $('device-status').textContent='Sending command to Spotify…';
+  try{
+    await api('/api/spotify/player/'+action,{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({...extra,device_id:deviceId||undefined})
+    });
+    if(action==='shuffle'){
+      shuffleEnabled=!!extra.state;
+      $('shuffle-toggle').textContent='Shuffle: '+(shuffleEnabled?'On':'Off');
+      $('shuffle-toggle').setAttribute('aria-pressed',String(shuffleEnabled));
+    }
+    $('device-status').textContent='Command sent. Updating playback…';
+    await playback();
+    await loadDevices();
+  }catch(error){
+    $('device-status').textContent=error.message==='spotify_no_active_device'
+      ? 'Spotify has no active device. Open Spotify on a device and try again.'
+      : error.message==='spotify_access_denied'
+        ? 'Spotify denied playback control. Reconnect and approve playback permissions.'
+        : error.message==='spotify_rate_limited'
+          ? 'Spotify is rate-limiting requests. Wait a moment and try again.'
+          : 'Could not control Spotify: '+error.message;
+  }finally{
+    buttons.forEach(id=>$(id).disabled=false);
+  }
+}
 async function connection(){
   try {
     const data = await api('/api/session');
@@ -327,8 +404,8 @@ async function connection(){
     $('connect').hidden = data.connected;
     $('find-lyrics').hidden = !data.connected;
     $('disconnect').hidden = !data.connected;
-    if (!data.connected) { clearTrack(); clearLyrics(); say('Connect Spotify to detect the track currently playing.'); stopPolling(); }
-    else { say('Connected'+(data.user?.displayName ? ' as '+data.user.displayName : '')+'. Checking playback…'); await playback(); startPolling(); }
+    if (!data.connected) { $('connect-controls').hidden=true; clearTrack(); clearLyrics(); say('Connect Spotify to detect the track currently playing.'); stopPolling(); }
+    else { say('Connected'+(data.user?.displayName ? ' as '+data.user.displayName : '')+'. Checking playback…'); await loadDevices(); await playback(); startPolling(); }
   } catch(e){ say('Could not check connection: '+e.message+'\nThe Worker may not be configured yet.'); }
 }
 async function playback(){
@@ -421,6 +498,12 @@ function stopPolling(){
 }
 $('connect').onclick=()=>location.href='/auth/login';
 $('check').onclick=playback;
+$('refresh-devices').onclick=loadDevices;
+$('spotify-device').onchange=()=>{selectedDeviceId=$('spotify-device').value;const device=availableDevices.find(item=>item.id===selectedDeviceId);if(device)$('device-status').textContent='Selected '+device.name+'.';};
+$('play-pause').onclick=()=>playerCommand(isPlaying?'pause':'play');
+$('previous-track').onclick=()=>playerCommand('previous');
+$('next-track').onclick=()=>playerCommand('next');
+$('shuffle-toggle').onclick=()=>playerCommand('shuffle',{state:!shuffleEnabled});
 $('find-lyrics').onclick=()=>findLyrics();
 $('dynamic-background-toggle').onclick=()=>setDynamicBackgroundEnabled(!dynamicBackgroundEnabled);
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('Disconnected from Spotify.')}catch(e){say('Could not disconnect: '+e.message)}};
