@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#111111">
-<meta name="description" content="A tiny experimental companion for finding lyrics and detecting your currently playing Spotify track.">
+<meta name="description" content="hi. it finds lyrics for whatever Spotify is playing. please work.">
 <title>lyric thing™</title>
 <link rel="stylesheet" href="/amll.css">
 <style>
@@ -83,23 +83,23 @@ button.secondary{background:transparent;color:#eee;border-color:#666}
 </head>
 <body>
 <div id="dynamic-background" aria-hidden="true"><div class="ambient-layer active"></div><div class="ambient-layer"></div><div class="ambient-shade"></div></div>
-<div class="eyebrow">a tiny music experiment</div>
+<div class="eyebrow">hi. hello. welcome.</div>
 <h1>lyric thing™</h1>
-<p>find the words. hopefully. first, let's see what Spotify is playing right now.</p>
+<p>hi this uses AMLL and Spicy Lyrics hi do you like it hey answer meee. connect Spotify and let’s see what’s playing.</p>
 <section class="panel">
   <span class="pill" id="connection">not connected</span>
   <div class="actions">
-    <button id="connect">Connect Spotify</button>
-    <button class="secondary" id="check">Check playback</button>
-    <button class="secondary" id="find-lyrics" hidden>Find lyrics</button>
-    <button class="secondary" id="disconnect">Disconnect</button>
-    <button class="secondary" id="dynamic-background-toggle" aria-pressed="true">Dynamic background: On</button>
+    <button id="connect">connect spotify!!</button>
+    <button class="secondary" id="check">what is playing. tell me.</button>
+    <button class="secondary" id="find-lyrics" hidden>get me the WORDS</button>
+    <button class="secondary" id="disconnect">disconnect (bye i guess)</button>
+    <button class="secondary" id="dynamic-background-toggle" aria-pressed="true">fancy background: on</button>
   </div>
   <div id="connect-controls" hidden>
     <div class="device-row">
-      <label for="spotify-device">Playback device</label>
+      <label for="spotify-device">where are we playing this</label>
       <select id="spotify-device" aria-label="Spotify playback device"></select>
-      <button class="secondary" id="refresh-devices" type="button">Refresh devices</button>
+      <button class="secondary" id="refresh-devices" type="button">look again</button>
     </div>
     <div class="actions playback-actions" aria-label="Spotify playback controls">
       <button class="secondary" id="previous-track" type="button" aria-label="Previous track" title="Previous track">
@@ -123,7 +123,7 @@ button.secondary{background:transparent;color:#eee;border-color:#666}
       <input id="progress-bar" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek through track" disabled>
       <span id="progress-duration">0:00</span>
     </div>
-    <p class="muted" id="device-status">Select a Spotify device to control playback.</p>
+    <p class="muted" id="device-status">pick a device. i cannot read minds. yet.</p>
   </div>
   <div id="status" role="status" aria-live="polite">Checking connection…</div>
   <div class="track" id="track" hidden>
@@ -131,13 +131,13 @@ button.secondary{background:transparent;color:#eee;border-color:#666}
     <div><h2 id="title">Nothing playing</h2><p id="artist"></p><p class="muted" id="album"></p><p class="muted" id="playstate"></p></div>
   </div>
   <div id="lyrics-panel" hidden>
-    <h2>the words™</h2>
-    <p id="lyrics-meta">Waiting for lyrics…</p>
+    <h2>THE WORDS™</h2>
+    <p id="lyrics-meta">the lyrics are in the microwave. one moment…</p>
     <div id="lyrics" aria-live="polite"></div>
-    <p class="muted" id="lyrics-attribution">Lyrics provider attribution will appear here.</p>
+    <p class="muted" id="lyrics-attribution">credit where credit is due!!</p>
   </div>
 </section>
-<p class="muted">Experimental lyric lookup. Synced lyrics highlight by line when timing data is available.</p>
+<p class="muted">made with AMLL + Spicy Lyrics + questionable amounts of hope. lyrics may be synced, unsynced, or simply not here. technology!!</p>
 <script type="module" src="/app.js"></script>
 </body>
 </html>
