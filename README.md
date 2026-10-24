@@ -1,12 +1,12 @@
 # lyric thing™
 
-A browser-based lyrics companion that detects the currently playing Spotify track and displays timed lyrics.
+a thing™ that renders lyrics™
 
 ## Rendering
 
-The frontend uses [Apple Music Like Lyrics (AMLL)](https://github.com/amll-dev/applemusic-like-lyrics), specifically `@applemusic-like-lyrics/core`, for Apple Music-style animated, syllable-level lyric rendering. Spicy Lyrics timing is converted into AMLL's millisecond-based `LyricLine[]` format. lrc.red TTML results use the same renderer when available.
+the frontend uses [Apple Music Like Lyrics (AMLL)](https://github.com/amll-dev/applemusic-like-lyrics), specifically `@applemusic-like-lyrics/core`, for Apple Music-style animated, syllable-level lyric rendering blah blah blah spicy lyrics timing is converted into AMLL's millisecond-based `LyricLine[]` format blah vlah blah lrc.red TTML results use the same renderer when available etc etc
 
-AMLL requires a bundled frontend; Vite builds the browser entry and stylesheet into `dist/`, which Cloudflare Workers serves as static assets.
+AMLL requires a bundled frontend; Vite builds the browser entry and stylesheet into `dist/`, which Cloudflare Workers serves as static assets. probably idk
 
 ## Development
 
