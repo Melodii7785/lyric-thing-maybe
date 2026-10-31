@@ -176,7 +176,7 @@ async function api(path, options={}) {
   if (!response.ok) { const error = new Error(data.error || 'Request failed ('+response.status+')'); error.details = data.details || ''; error.status = response.status; throw error; }
   return data;
 }
-function clearTrack(){ $('track').hidden=true; $('cover').style.display='none'; }
+function clearTrack(){ $('track').hidden=true; $('nowbar').hidden=true; $('cover').style.display='none'; }
 function clearLyrics(){
   lyricLines=[];
   if(amllPlayer){
@@ -446,11 +446,14 @@ async function playback(){
     $('track').hidden=false;
     $('title').textContent=data.track.title;
     $('artist').textContent=(data.track.artists||[]).join(', ') || 'Unknown artist';
+    $('nowbar').hidden=false;
+    $('nowbar-title').textContent=data.track.title;
+    $('nowbar-artist').textContent=(data.track.artists||[]).join(', ') || 'Unknown artist';
     $('album').textContent=data.track.album || '';
     $('playstate').textContent=data.playing ? 'Playing' : 'Paused';
     $('play-pause').innerHTML=data.playing?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM15 5h3v14h-3z" fill="currentColor"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>';
     $('play-pause').setAttribute('aria-label',data.playing?'Pause':'Play');
-    if(data.track.image){ $('cover').src=data.track.image; $('cover').style.display='block'; } else $('cover').style.display='none';
+    if(data.track.image){ $('cover').src=data.track.image; $('cover').style.display='block'; $('nowbar-cover').src=data.track.image; } else $('cover').style.display='none';
     latestProgressMs=Number(data.progressMs||0);
     trackDurationMs=Number(data.track.durationMs||0);
     progressObservedAt=Date.now();
