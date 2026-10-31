@@ -158,6 +158,50 @@ function setDynamicBackgroundEnabled(enabled){
   button.setAttribute('aria-pressed', String(enabled));
   if(enabled && ambientImageUrl) void setAmbientBackground(ambientImageUrl, true);
 }
+
+// Tiny Apple-cover experiment: Apple documents JSONP callbacks for cross-site Search API requests.
+function searchAppleCoverDirect(track){
+  return new Promise((resolve, reject) => {
+    const callback = '__appleCover_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const cleanup = () => {
+      script.remove();
+      try { delete window[callback]; } catch {}
+    };
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('apple_cover_timeout'));
+    }, 10000);
+    window[callback] = data => {
+      clearTimeout(timeout);
+      cleanup();
+      const results = Array.isArray(data?.results) ? data.results : [];
+      const wantedTitle = String(track.title || '').toLowerCase();
+      const wantedArtist = String((track.artists || [])[0] || '').toLowerCase();
+      const best = results.find(item =>
+        String(item.trackName || '').toLowerCase() === wantedTitle &&
+        String(item.artistName || '').toLowerCase().includes(wantedArtist)
+      ) || results[0] || null;
+      resolve(best);
+    };
+    script.onerror = () => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(new Error('apple_cover_load_failed'));
+    };
+    const params = new URLSearchParams({
+      term: [track.title, (track.artists || [])[0], track.album].filter(Boolean).join(' '),
+      country: 'BR',
+      media: 'music',
+      entity: 'song',
+      limit: '5',
+      callback
+    });
+    script.src = 'https://itunes.apple.com/search?' + params;
+    document.head.appendChild(script);
+  });
+}
+window.testAppleCover = searchAppleCoverDirect;
 function say(message){ $('status').textContent = message; }
 async function api(path, options={}) {
   const response = await fetch(path, { credentials:'same-origin', cache:'no-store', ...options });
@@ -452,6 +496,10 @@ async function playback(){
       if(isPlaying) amllPlayer.resume(); else amllPlayer.pause();
     }
     if (trackChanged) {
+      // Test Apple directly from the browser, separately from the Worker experiment.
+      searchAppleCoverDirect(data.track)
+        .then(result => console.log('[Apple cover test]', result))
+        .catch(error => console.warn('[Apple cover test failed]', error));
       clearLyrics();
       $('lyrics-panel').hidden = false;
       $('lyrics-meta').textContent = 'New track detected. Loading lyrics…';
