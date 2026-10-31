@@ -547,6 +547,20 @@ $('progress-bar').addEventListener('input',()=>{seekingProgress=true;$('progress
 $('progress-bar').addEventListener('change',async()=>{const position=Math.round(Number($('progress-bar').value)/1000*trackDurationMs);seekingProgress=false;try{await api('/api/spotify/player/seek',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({position_ms:position,device_id:selectedDevice()||undefined})});latestProgressMs=position;progressObservedAt=Date.now();renderProgress();}catch(error){$('device-status').textContent='could not skip to that bit: '+error.message+' :(';await playback();}});
 $('find-lyrics').onclick=()=>findLyrics();
 $('dynamic-background-toggle').onclick=()=>setDynamicBackgroundEnabled(!dynamicBackgroundEnabled);
+$('refresh-fancy-background').onclick=async()=>{
+  if(!ambientImageUrl){ say('there is no fancy background to refresh yet. play something first maybe'); return; }
+  const button=$('refresh-fancy-background');
+  button.disabled=true;
+  const originalText=button.textContent;
+  button.textContent='refreshing the fanciness...';
+  try{
+    await setAmbientBackground(ambientImageUrl,true);
+    say('fancy background refreshed. hopefully Kawarp listened this time.');
+  }finally{
+    button.disabled=false;
+    button.textContent=originalText;
+  }
+};
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('okay bye Spotify. see you later i guess.')}catch(e){say('Spotify would not let me leave. '+e.message)}};
 function animateAMLL(frameTime){
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
