@@ -151,14 +151,15 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
 #progress-bar:disabled{opacity:.45;cursor:default}
 #device-status{margin:6px 0 14px;color:var(--muted)}
 @media(min-width:901px){
-  body{max-width:1280px}
   .track{display:none!important}
-  .nowbar{display:block;position:fixed;left:calc(50% + 245px);top:50%;transform:translateY(-50%);width:min(360px,30vw);text-align:center}
+  #lyrics-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,360px);column-gap:clamp(48px,7vw,120px);align-items:start;max-width:1180px}
+  #lyrics-panel>h2,#lyrics-panel>#lyrics-meta{grid-column:1}
+  #lyrics{grid-column:1;grid-row:3;min-width:0}
+  #lyrics-attribution{grid-column:1}
+  .nowbar{display:block!important;grid-column:2;grid-row:3;position:sticky;top:48px;width:100%;text-align:center;align-self:start}
   .nowbar img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:0;background:#222;box-shadow:0 10px 30px rgba(0,0,0,.18)}
   .nowbar h2{margin:20px 0 2px;font-size:clamp(1.35rem,2vw,2rem);line-height:1.15;letter-spacing:-.035em;color:#fff}
   .nowbar p{margin:0;color:#ddd;font-size:1.05rem}
-  #lyrics-panel{max-width:640px}
-  .panel{max-width:640px}
 }
 @media(max-width:900px){
   .nowbar{display:none}
@@ -222,14 +223,14 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
     <img id="cover" alt="Album cover">
     <div><h2 id="title">Nothing playing</h2><p id="artist"></p><p class="muted" id="album"></p><p class="muted" id="playstate"></p></div>
   </div>
-  <aside class="nowbar" id="nowbar" hidden aria-label="Now playing">
-    <img id="nowbar-cover" alt="Album cover">
-    <h2 id="nowbar-title">Nothing playing</h2>
-    <p id="nowbar-artist"></p>
-  </aside>
   <div id="lyrics-panel" hidden>
     <h2>THE WORDS™</h2>
     <p id="lyrics-meta">the lyrics are in the microwave. one moment…</p>
+    <aside class="nowbar" id="nowbar" hidden aria-label="Now playing">
+      <img id="nowbar-cover" alt="Album cover">
+      <h2 id="nowbar-title">Nothing playing</h2>
+      <p id="nowbar-artist"></p>
+    </aside>
     <div id="lyrics" aria-live="polite"></div>
     <p class="muted" id="lyrics-attribution">credit where credit is due!!</p>
   </div>
