@@ -22,86 +22,49 @@ amllPlayer.setOptimizeOptions({
 let latestProgressMs = 0;
 let progressObservedAt = Date.now();
 let isPlaying = false;
-let ambientLayerIndex = 0;
+let kawarp = null;
+let kawarpLoading = null;
+let kawarpSourceUrl = '';
 let dynamicBackgroundEnabled = true;
 let ambientImageUrl = '';
 let ambientRequestId = 0;
 let beatAnalysis = null;
 let beatAnalysisTrackId = null;
 let beatPulse = 0;
-const fallbackMeshColors = [[255, 91, 164], [107, 78, 255], [30, 190, 220], [255, 166, 72], [110, 218, 143]];
-function rgbString(rgb, alpha = 1){
-  return 'rgba(' + rgb.map(value => Math.round(value)).join(',') + ',' + alpha + ')';
-}
-function makeMeshGradient(colors){
-  const positions = [[18, 22], [78, 20], [52, 78], [8, 76], [91, 68]];
-  return colors.map((color, index) =>
-    'radial-gradient(ellipse at ' + positions[index][0] + '% ' + positions[index][1] + '%, ' +
-    rgbString(color, 0.95) + ' 0%, ' + rgbString(color, 0.48) + ' 22%, transparent 62%)'
-  ).join(',');
-}
-function extractArtworkColors(imageUrl, requestId){
-  return new Promise(resolve => {
-    const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.onload = () => {
-      if(requestId !== ambientRequestId) return resolve(null);
-      try {
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d', { willReadFrequently: true });
-        if(!context) return resolve(null);
-        const size = 48;
-        canvas.width = size;
-        canvas.height = size;
-        context.drawImage(image, 0, 0, size, size);
-        const pixels = context.getImageData(0, 0, size, size).data;
-        const bins = new Map();
-        for(let i = 0; i < pixels.length; i += 4 * 3){
-          const alpha = pixels[i + 3] / 255;
-          if(alpha < 0.6) continue;
-          let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
-          const max = Math.max(r, g, b), min = Math.min(r, g, b);
-          if(max < 28 || max - min < 12) continue;
-          const key = [r, g, b].map(value => Math.round(value / 32)).join(',');
-          const bin = bins.get(key) || { count: 0, r: 0, g: 0, b: 0 };
-          bin.count++;
-          bin.r += r; bin.g += g; bin.b += b;
-          bins.set(key, bin);
-        }
-        const ranked = Array.from(bins.values()).sort((a, b) => b.count - a.count);
-        const colors = [];
-        for(const bin of ranked){
-          const color = [bin.r / bin.count, bin.g / bin.count, bin.b / bin.count];
-          if(colors.every(existing => Math.sqrt(existing.reduce((sum, value, index) => sum + (value - color[index]) ** 2, 0)) > 55)){
-            colors.push(color);
-          }
-          if(colors.length === 5) break;
-        }
-        while(colors.length < 5){
-          colors.push(fallbackMeshColors[colors.length]);
-        }
-        resolve(colors);
-      } catch {
-        resolve(null);
-      }
-    };
-    image.onerror = () => resolve(null);
-    image.src = imageUrl;
-  });
+async function getKawarp(){
+  if(kawarp) return kawarp;
+  if(!kawarpLoading){
+    kawarpLoading = import('https://cdn.jsdelivr.net/npm/@kawarp/core@1.3.0/+esm')
+      .then(({ Kawarp }) => {
+        const canvas = $('kawarp-background');
+        kawarp = new Kawarp(canvas, {
+          warpIntensity: 0.82,
+          blurPasses: 12,
+          animationSpeed: 0.75,
+          transitionDuration: 900,
+          saturation: 1.25,
+          tintColor: [0.04, 0.04, 0.07],
+          tintIntensity: 0.28,
+          scale: 1.12
+        });
+        kawarp.start();
+        return kawarp;
+      });
+  }
+  return kawarpLoading;
 }
 async function setAmbientBackground(imageUrl, force = false){
-  if(!imageUrl || (!force && imageUrl === ambientImageUrl)) return;
+  if(!imageUrl || (!force && imageUrl === kawarpSourceUrl)) return;
+  kawarpSourceUrl = imageUrl;
   ambientImageUrl = imageUrl;
-  const requestId = ++ambientRequestId;
-  const colors = await extractArtworkColors(imageUrl, requestId);
-  if(requestId !== ambientRequestId || !dynamicBackgroundEnabled) return;
-  const layers = Array.from(document.querySelectorAll('.ambient-layer'));
-  if(layers.length !== 2) return;
-  const nextIndex = 1 - ambientLayerIndex;
-  layers[nextIndex].style.backgroundImage = makeMeshGradient(colors || fallbackMeshColors);
-  layers[nextIndex].classList.add('active');
-  layers[ambientLayerIndex].classList.remove('active');
-  ambientLayerIndex = nextIndex;
+  if(!dynamicBackgroundEnabled) return;
+  try {
+    const renderer = await getKawarp();
+    if(imageUrl !== kawarpSourceUrl || !dynamicBackgroundEnabled) return;
+    await renderer.loadImage(imageUrl);
+  } catch(error) {
+    console.warn('[Kawarp background failed]', error);
+  }
 }
 function loadBeatAnalysis(trackId){
   if(!trackId || !/^[A-Za-z0-9]{22}$/.test(trackId)){
@@ -120,36 +83,9 @@ function loadBeatAnalysis(trackId){
         .sort((a,b) => a.start - b.start) : [];
       beatAnalysis = beats.length ? beats : null;
     })
-    .catch(() => {
-      // Audio analysis is optional; keep the ordinary ambient gradient working.
-      if(beatAnalysisTrackId === trackId) beatAnalysis = null;
-    });
+    .catch(() => { if(beatAnalysisTrackId === trackId) beatAnalysis = null; });
 }
-function updateBeatPulse(){
-  const background = $('dynamic-background');
-  if(!dynamicBackgroundEnabled || !isPlaying || !beatAnalysis?.length){
-    beatPulse *= 0.82;
-  } else {
-    const time = currentPlaybackSeconds();
-    let low = 0, high = beatAnalysis.length - 1;
-    while(low < high){
-      const mid = Math.ceil((low + high) / 2);
-      if(beatAnalysis[mid].start <= time) low = mid;
-      else high = mid - 1;
-    }
-    const beat = beatAnalysis[low];
-    if(beat && time >= beat.start){
-      const elapsed = time - beat.start;
-      const decay = Math.max(0, 1 - elapsed / Math.min(beat.duration, 0.65));
-      const confidence = Number.isFinite(beat.confidence) ? Math.max(0.35, Math.min(1, beat.confidence)) : 0.8;
-      beatPulse = Math.max(beatPulse * 0.72, decay * confidence);
-    } else {
-      beatPulse *= 0.82;
-    }
-  }
-  background.style.setProperty('--beat-brightness', (1 + beatPulse * 0.16).toFixed(3));
-  background.style.setProperty('--beat-background-size', (150 + beatPulse * 4).toFixed(2) + '%');
-}
+function updateBeatPulse(){}
 function setDynamicBackgroundEnabled(enabled){
   dynamicBackgroundEnabled = enabled;
   $('dynamic-background').classList.toggle('off', !enabled);
@@ -158,7 +94,6 @@ function setDynamicBackgroundEnabled(enabled){
   button.setAttribute('aria-pressed', String(enabled));
   if(enabled && ambientImageUrl) void setAmbientBackground(ambientImageUrl, true);
 }
-
 // Tiny Apple-cover experiment: Apple documents JSONP callbacks for cross-site Search API requests.
 function searchAppleCoverDirect(track){
   return new Promise((resolve, reject) => {
@@ -486,7 +421,7 @@ async function playback(){
     $('playstate').textContent=data.playing ? 'Playing' : 'Paused';
     $('play-pause').innerHTML=data.playing?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM15 5h3v14h-3z" fill="currentColor"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>';
     $('play-pause').setAttribute('aria-label',data.playing?'Pause':'Play');
-    if(data.track.image){ $('cover').src=data.track.image; $('cover').style.display='block'; setAmbientBackground(data.track.image); } else $('cover').style.display='none';
+    if(data.track.image){ $('cover').src=data.track.image; $('cover').style.display='block'; } else $('cover').style.display='none';
     latestProgressMs=Number(data.progressMs||0);
     trackDurationMs=Number(data.track.durationMs||0);
     progressObservedAt=Date.now();
@@ -501,8 +436,16 @@ async function playback(){
     if (trackChanged) {
       // Test Apple directly from the browser, separately from the Worker experiment.
       searchAppleCoverDirect(data.track)
-        .then(result => console.log('[Apple cover test]', result))
-        .catch(error => console.warn('[Apple cover test failed]', error));
+        .then(result => {
+          console.log('[Apple cover test]', result);
+          const appleArtwork = result?.artworkUrlLarge || result?.artworkUrl100;
+          if(appleArtwork) setAmbientBackground(appleArtwork);
+          else if(data.track.image) setAmbientBackground(data.track.image);
+        })
+        .catch(error => {
+          console.warn('[Apple cover test failed]', error);
+          if(data.track.image) setAmbientBackground(data.track.image);
+        });
       clearLyrics();
       $('lyrics-panel').hidden = false;
       $('lyrics-meta').textContent = 'New track detected. Loading lyrics…';
