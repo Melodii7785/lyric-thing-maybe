@@ -44,7 +44,7 @@ async function getKawarp(){
           transitionDuration: 1000,
           saturation: 3.0,
           tintColor: [40 / 255, 40 / 255, 60 / 255],
-          tintIntensity: 1.0,
+          tintIntensity: 0.0,
           ditherStrength: 0.0,
           scale: 1.0
         });
