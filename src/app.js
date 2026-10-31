@@ -182,6 +182,9 @@ function searchAppleCoverDirect(track){
         String(item.trackName || '').toLowerCase() === wantedTitle &&
         String(item.artistName || '').toLowerCase().includes(wantedArtist)
       ) || results[0] || null;
+      if (best?.artworkUrl100) {
+        best.artworkUrlLarge = best.artworkUrl100.replace(/\d+x\d+(bb)?/i, '1200x1200bb');
+      }
       resolve(best);
     };
     script.onerror = () => {
