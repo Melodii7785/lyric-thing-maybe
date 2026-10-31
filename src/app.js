@@ -54,10 +54,38 @@ async function getKawarp(){
   }
   return kawarpLoading;
 }
+function setLyricsContrastFromCover(imageUrl){
+  const image = new Image();
+  image.crossOrigin = 'anonymous';
+  image.onload = () => {
+    try {
+      const canvas = document.createElement('canvas');
+      const size = 32;
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(image, 0, 0, size, size);
+      const pixels = ctx.getImageData(0, 0, size, size).data;
+      let luminance = 0;
+      for(let i = 0; i < pixels.length; i += 4){
+        // Relative luminance: good enough to decide whether black or white survives.
+        luminance += (0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2]);
+      }
+      luminance /= (pixels.length / 4);
+      document.documentElement.style.setProperty('--amll-unfocused', luminance > 150 ? '#000' : '#fff');
+      console.log('[Lyric contrast]', luminance > 150 ? 'black lyrics' : 'white lyrics', luminance);
+    } catch(error) {
+      console.warn('[Lyric contrast sampling failed]', error);
+    }
+  };
+  image.onerror = () => console.warn('[Lyric contrast image failed]');
+  image.src = imageUrl;
+}
+
 async function setAmbientBackground(imageUrl, force = false){
   if(!imageUrl || (!force && imageUrl === kawarpSourceUrl)) return;
   kawarpSourceUrl = imageUrl;
   ambientImageUrl = imageUrl;
+  setLyricsContrastFromCover(imageUrl);
   if(!dynamicBackgroundEnabled) return;
   try {
     const renderer = await getKawarp();
