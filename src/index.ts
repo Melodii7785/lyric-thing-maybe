@@ -278,6 +278,25 @@ async function handle(request: Request, env: Env): Promise<Response> {
       durationMs: track.duration_ms ?? null, uri: track.uri ?? null,
     }});
   }
+  if (path === "/api/cover-proxy" && request.method === "GET") {
+    const target = url.searchParams.get("url");
+    if (!target) return json({ error: "missing_url" }, 400);
+    let imageUrl: URL;
+    try { imageUrl = new URL(target); }
+    catch { return json({ error: "invalid_url" }, 400); }
+    // Only proxy Apple's artwork CDN; don't turn this endpoint into an open proxy.
+    if (!/(^|\.)mzstatic\.com$/i.test(imageUrl.hostname)) return json({ error: "unsupported_image_host" }, 400);
+    const image = await fetch(imageUrl.toString(), {
+      headers: { accept: "image/avif,image/webp,image/*,*/*;q=0.8" },
+      cf: { cacheTtl: 86400, cacheEverything: true },
+    });
+    if (!image.ok) return json({ error: "cover_fetch_failed", status: image.status }, 502);
+    const headers = new Headers();
+    headers.set("content-type", image.headers.get("content-type") || "image/jpeg");
+    headers.set("cache-control", "public, max-age=86400");
+    return new Response(image.body, { status: 200, headers });
+  }
+
   if (path === "/api/apple-cover" && request.method === "GET") {
     let session = await getSession(request, env);
     if (!session) return json({ error: "not_connected" }, 401);
