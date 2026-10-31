@@ -40,7 +40,7 @@ body{
   max-width:980px;
   min-height:100vh;
   padding:clamp(20px,4vw,42px);
-  background:var(--bg);
+  background:transparent;
   color:var(--text);
   font-family:inherit;
   font-size:16px;
@@ -51,7 +51,8 @@ body{
 #dynamic-background{position:fixed;inset:0;z-index:0;overflow:hidden;background:#111;pointer-events:none}
 #dynamic-background canvas{width:100%;height:100%;display:block;opacity:.72;transition:opacity .35s ease}
 #dynamic-background.off canvas{opacity:0}
-body::before{content:"";position:fixed;inset:0;z-index:-1;background:rgba(10,10,12,.42);pointer-events:none}
+body::before{content:"";position:fixed;inset:0;z-index:0;background:rgba(10,10,12,.42);pointer-events:none}
+body > :not(#dynamic-background){position:relative;z-index:1}
 .eyebrow{
   color:var(--accent-hot);
   font-size:.75rem;
