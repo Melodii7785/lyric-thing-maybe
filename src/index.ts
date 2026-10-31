@@ -303,12 +303,31 @@ async function handle(request: Request, env: Env): Promise<Response> {
       country: "BR",
       media: "music",
       entity: "song",
-      limit: "10",
+      limit: "5",
     }).toString();
 
-    const appleResponse = await fetch(search.toString(), { headers: { accept: "application/json" } });
-    if (!appleResponse.ok) return json({ error: "apple_search_failed", status: appleResponse.status }, 502);
-    const appleData = await appleResponse.json() as { results?: any[] };
+    // Apple's Search API is rate-limited, so cache each lookup by its exact query.
+    const cache = caches.default;
+    const cacheKey = new Request("https://lyricthing-cache.invalid/apple-cover?" + search.searchParams.toString());
+    let appleData: { results?: any[] };
+    const cached = await cache.match(cacheKey);
+    if (cached) {
+      appleData = await cached.json() as { results?: any[] };
+    } else {
+      const appleResponse = await fetch(search.toString(), { headers: { accept: "application/json" } });
+      if (!appleResponse.ok) {
+        return json({
+          error: appleResponse.status === 429 ? "apple_rate_limited" : "apple_search_failed",
+          status: appleResponse.status,
+          retryAfter: appleResponse.headers.get("Retry-After"),
+          hint: appleResponse.status === 429 ? "Apple said slow down. This endpoint now caches successful searches so the same song will not keep asking Apple." : null,
+        }, appleResponse.status === 429 ? 429 : 502);
+      }
+      appleData = await appleResponse.json() as { results?: any[] };
+      await cache.put(cacheKey, new Response(JSON.stringify(appleData), {
+        headers: { "content-type": "application/json", "cache-control": "public, max-age=86400" },
+      }));
+    }
     const normalize = (value: unknown) => String(value || "").toLocaleLowerCase("en-US").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 
     const wantedTitle = normalize(title);
