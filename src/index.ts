@@ -278,6 +278,70 @@ async function handle(request: Request, env: Env): Promise<Response> {
       durationMs: track.duration_ms ?? null, uri: track.uri ?? null,
     }});
   }
+  if (path === "/api/apple-cover" && request.method === "GET") {
+    let session = await getSession(request, env);
+    if (!session) return json({ error: "not_connected" }, 401);
+    try { session = await refresh(session, env); }
+    catch { return json({ error: "spotify_reconnect_required" }, 401); }
+
+    const playbackResponse = await fetch(API_URL + "/me/player/currently-playing", {
+      headers: { authorization: "Bearer " + await decrypt(env, session.access_token_enc), accept: "application/json" },
+    });
+    if (playbackResponse.status === 204 || playbackResponse.status === 202) return json({ error: "nothing_playing" }, 404);
+    if (!playbackResponse.ok) return json({ error: "spotify_request_failed", status: playbackResponse.status }, 502);
+
+    const playback = await playbackResponse.json() as any;
+    const track = playback?.item;
+    if (!track) return json({ error: "nothing_playing" }, 404);
+
+    const title = String(track.name || "");
+    const artists = Array.isArray(track.artists) ? track.artists.map((artist: any) => String(artist.name || "")).filter(Boolean) : [];
+    const album = String(track.album?.name || "");
+    const search = new URL("https://itunes.apple.com/search");
+    search.search = new URLSearchParams({
+      term: [title, artists[0] || "", album].filter(Boolean).join(" "),
+      country: "BR",
+      media: "music",
+      entity: "song",
+      limit: "10",
+    }).toString();
+
+    const appleResponse = await fetch(search.toString(), { headers: { accept: "application/json" } });
+    if (!appleResponse.ok) return json({ error: "apple_search_failed", status: appleResponse.status }, 502);
+    const appleData = await appleResponse.json() as { results?: any[] };
+    const normalize = (value: unknown) => String(value || "").toLocaleLowerCase("en-US").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+
+    const wantedTitle = normalize(title);
+    const wantedArtist = normalize(artists[0]);
+    const wantedAlbum = normalize(album);
+    const scored = (Array.isArray(appleData.results) ? appleData.results : [])
+      .filter(result => result && typeof result.artworkUrl100 === "string")
+      .map(result => {
+        const resultTitle = normalize(result.trackName);
+        const resultArtist = normalize(result.artistName);
+        const resultAlbum = normalize(result.collectionName);
+        let score = 0;
+        if (resultTitle === wantedTitle) score += 100;
+        else if (resultTitle.includes(wantedTitle) || wantedTitle.includes(resultTitle)) score += 45;
+        if (wantedArtist && (resultArtist === wantedArtist || resultArtist.includes(wantedArtist) || wantedArtist.includes(resultArtist))) score += 50;
+        if (wantedAlbum && (resultAlbum === wantedAlbum || resultAlbum.includes(wantedAlbum) || wantedAlbum.includes(resultAlbum))) score += 35;
+        return { result, score };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const results = scored.map(({ result, score }) => ({
+      score,
+      track: result.trackName ?? null,
+      artist: result.artistName ?? null,
+      album: result.collectionName ?? null,
+      artwork: result.artworkUrl100 ?? null,
+    }));
+    return json({
+      spotify: { title, artists, album },
+      best: results[0] ?? null,
+      candidates: results,
+    });
+  }
   if (path === "/api/spotify/analysis" && request.method === "GET") {
     const session = await getSession(request, env);
     if (!session) return json({ error: "not_connected" }, 401);
