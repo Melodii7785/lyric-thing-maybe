@@ -48,7 +48,10 @@ body{
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
 }
-#dynamic-background{display:none}
+#dynamic-background{position:fixed;inset:0;z-index:0;overflow:hidden;background:#111;pointer-events:none}
+#dynamic-background canvas{width:100%;height:100%;display:block;opacity:.72;transition:opacity .35s ease}
+#dynamic-background.off canvas{opacity:0}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:rgba(10,10,12,.42);pointer-events:none}
 .eyebrow{
   color:var(--accent-hot);
   font-size:.75rem;
@@ -152,7 +155,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
 </style>
 </head>
 <body>
-<div id="dynamic-background" aria-hidden="true"><div class="ambient-layer active"></div><div class="ambient-layer"></div><div class="ambient-shade"></div></div>
+<div id="dynamic-background" aria-hidden="true"><canvas id="kawarp-background"></canvas></div>
 <div class="eyebrow">hi. hello. welcome.</div>
 <h1>lyric thing™</h1>
 <p>hi this uses AMLL and Spicy Lyrics hi do you like it hey answer meee. connect Spotify and let’s see what’s playing.</p>
