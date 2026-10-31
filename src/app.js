@@ -38,14 +38,15 @@ async function getKawarp(){
       .then(({ Kawarp }) => {
         const canvas = $('kawarp-background');
         kawarp = new Kawarp(canvas, {
-          warpIntensity: 0.82,
-          blurPasses: 12,
-          animationSpeed: 0.75,
-          transitionDuration: 900,
-          saturation: 1.25,
-          tintColor: [0.04, 0.04, 0.07],
-          tintIntensity: 0.28,
-          scale: 1.12
+          warpIntensity: 1.0,
+          blurPasses: 6,
+          animationSpeed: 1.0,
+          transitionDuration: 1000,
+          saturation: 3.0,
+          tintColor: [40 / 255, 40 / 255, 60 / 255],
+          tintIntensity: 1.0,
+          ditherStrength: 0.0,
+          scale: 1.0
         });
         kawarp.start();
         return kawarp;
