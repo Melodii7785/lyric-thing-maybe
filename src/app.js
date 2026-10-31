@@ -85,7 +85,7 @@ async function setAmbientBackground(imageUrl, force = false){
   if(!imageUrl || (!force && imageUrl === kawarpSourceUrl)) return;
   kawarpSourceUrl = imageUrl;
   ambientImageUrl = imageUrl;
-  setLyricsContrastFromCover(imageUrl);
+  setLyricsContrastFromCover('/api/cover-proxy?url=' + encodeURIComponent(imageUrl));
   if(!dynamicBackgroundEnabled) return;
   try {
     const renderer = await getKawarp();
