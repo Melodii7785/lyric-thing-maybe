@@ -29,7 +29,6 @@ let kawarpSourceUrl = '';
 let dynamicBackgroundEnabled = true;
 let ambientImageUrl = '';
 let nowbarMotionHls = null;
-let mobileMotionHls = null;
 let ambientRequestId = 0;
 let beatAnalysis = null;
 let beatAnalysisTrackId = null;
@@ -98,44 +97,44 @@ async function setAmbientBackground(imageUrl, force = false){
     console.warn('[Kawarp background failed]', error);
   }
 }
-async function attachMotion(video, url, hlsKey){
-  if(!url) throw new Error('no motion URL');
-  if(hlsKey === 'desktop' && nowbarMotionHls){ nowbarMotionHls.destroy(); nowbarMotionHls=null; }
-  if(hlsKey === 'mobile' && mobileMotionHls){ mobileMotionHls.destroy(); mobileMotionHls=null; }
-  if(Hls.isSupported()){
-    const hls=new Hls();
-    hls.on(Hls.Events.ERROR, (_event,data)=>{ if(data.fatal){ hls.destroy(); video.style.display='none'; } });
-    hls.loadSource(url); hls.attachMedia(video);
-    if(hlsKey === 'desktop') nowbarMotionHls=hls; else mobileMotionHls=hls;
-  }else if(video.canPlayType('application/vnd.apple.mpegurl')) video.src=url;
-  else throw new Error('HLS not supported');
-  video.muted=true; video.loop=true; video.playsInline=true;
-  video.onloadeddata=()=>{ video.style.display='block'; video.play().catch(()=>{}); };
-}
-
 async function loadNowbarMotion(){
-  const desktop=$('nowbar-motion'), mobile=$('mobile-motion');
+  const video=$('nowbar-motion');
   try{
     const response=await fetch('/api/apple-motion',{credentials:'same-origin'});
     if(!response.ok) throw new Error('no motion artwork');
     const motion=await response.json();
+    if(!motion.square) throw new Error('no square motion artwork');
+    if(nowbarMotionHls){ nowbarMotionHls.destroy(); nowbarMotionHls=null; }
+    // Prefer hls.js where possible. Some Chromium browsers say they "maybe"
+    // support HLS natively, then proceed to display absolutely nothing. Rude.
+    if(Hls.isSupported()){
+      nowbarMotionHls=new Hls();
+      nowbarMotionHls.on(Hls.Events.ERROR, (_event, data)=>{
+        if(data.fatal){
+          nowbarMotionHls?.destroy();
+          nowbarMotionHls=null;
+          video.style.display='none';
+          $('nowbar-cover').style.display='block';
+        }
+      });
+      nowbarMotionHls.loadSource(motion.square);
+      nowbarMotionHls.attachMedia(video);
+    }else if(video.canPlayType('application/vnd.apple.mpegurl')){
+      video.src=motion.square;
+    }else throw new Error('HLS not supported');
 
-    if(motion.square){
-      await attachMotion(desktop,motion.square,'desktop');
-      desktop.onloadeddata=()=>{ desktop.style.display='block'; $('nowbar-cover').style.display='none'; desktop.play().catch(()=>{}); };
-    }
-    if(motion.tall){
-      $('mobile-motion-wrap').hidden=false;
-      await attachMotion(mobile,motion.tall,'mobile');
-      mobile.onloadeddata=()=>{ mobile.style.display='block'; $('mobile-motion-cover').style.display='none'; mobile.play().catch(()=>{}); };
-    }else{
-      $('mobile-motion-wrap').hidden=true;
-    }
-  }catch{
-    $('mobile-motion-wrap').hidden=true;
-    desktop.style.display='none';
-    $('nowbar-cover').style.display='block';
-  }
+    video.muted=true; video.loop=true; video.playsInline=true;
+    // Keep the normal cover visible until we have an actual video frame.
+    video.onloadeddata=()=>{
+      video.style.display='block';
+      $('nowbar-cover').style.display='none';
+      video.play().catch(()=>{});
+    };
+    video.onerror=()=>{
+      video.style.display='none';
+      $('nowbar-cover').style.display='block';
+    };
+  }catch{ /* static cover is the normal fallback */ }
 }
 
 function loadBeatAnalysis(trackId){
@@ -506,9 +505,6 @@ async function playback(){
         void nowbarCover.offsetWidth;
         nowbarCover.src=newImage;
         nowbarCover.classList.add('art-changing');
-        const mobileCover=$('mobile-motion-cover');
-        mobileCover.src=newImage;
-        mobileCover.style.display='block';
         loadNowbarMotion();
       }
     } else $('cover').style.display='none';
