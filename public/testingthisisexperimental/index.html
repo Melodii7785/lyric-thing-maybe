@@ -185,14 +185,15 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
   body>.eyebrow,body>h1,body>p:first-of-type,body>.panel{display:none}
   .mobile-player{display:flex;position:relative;z-index:2;min-height:100svh;flex-direction:column;justify-content:flex-end;overflow:hidden;padding:clamp(22px,6vw,38px) 24px 28px;color:#fff}
   .mobile-player[hidden]{display:none}
-  .mobile-player-art{position:absolute;inset:0;z-index:-2;background:#111;overflow:hidden}
+  .mobile-player-art{position:absolute;inset:0;z-index:-2;background:transparent;overflow:hidden}
   .mobile-player-art img,.mobile-player-art video{
     position:absolute;inset:0;width:100%;height:72%;object-fit:cover;
     -webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 58%,transparent 100%);
     mask-image:linear-gradient(to bottom,#000 0%,#000 58%,transparent 100%);
   }
   .mobile-player-art video{display:none}
-  .mobile-player-art::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,transparent 45%,rgba(10,10,10,.12) 64%,rgba(10,10,10,.65) 82%,rgba(10,10,10,.9) 100%)}
+  /* Let Kawarp show through the transparent part of the artwork. No black fake-gradient nonsense. */
+  .mobile-player-art::after{content:none}
   .mobile-player-info{margin-top:auto;text-shadow:0 2px 16px rgba(0,0,0,.4)}
   .mobile-player-info h2{margin:0;font-size:clamp(1.75rem,8vw,2.55rem);line-height:1.08;letter-spacing:-.045em}
   .mobile-player-info p{margin:7px 0 0;font-size:1.1rem;color:rgba(255,255,255,.78)}
