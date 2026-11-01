@@ -328,9 +328,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
       const response = await fetch(motionUrl.toString(), { headers: { accept: "application/json" } });
       if (!response.ok) return json({ error: "apple_motion_search_failed", status: response.status }, 502);
       const data = await response.json() as any;
-      const square = data?.square ?? data?.Square ?? data?.artwork?.square ?? null;
-      const squareUrl = square?.m3u8 ?? square?.url ?? square?.streamUrl ?? data?.squareUrl ?? data?.m3u8 ?? null;
-      const payload = { square: squareUrl, raw: square ? undefined : undefined };
+      const squareUrl = typeof data?.url === "string" ? data.url : null;
+      const tallUrl = typeof data?.url_tall === "string" ? data.url_tall : null;
+      const payload = { square: squareUrl, tall: tallUrl, artist: data?.artist ?? null, album: data?.album ?? null };
       const out = json(payload);
       if (squareUrl) await cache.put(cacheKey, out.clone());
       return out;
