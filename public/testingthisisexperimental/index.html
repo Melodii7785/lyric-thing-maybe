@@ -176,10 +176,54 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
   #lyrics{height:55vh;max-height:65vh}
 }
 @media(prefers-reduced-motion:reduce){button{transition:none}}
+
+/* Experimental mobile player — testingthisisexperimental™ only. */
+.mobile-player{display:none}
+@media(max-width:900px){
+  body{max-width:none;padding:0;overflow-x:hidden}
+  body::before{background:rgba(8,8,10,.18)}
+  body>.eyebrow,body>h1,body>p:first-of-type,body>.panel{display:none}
+  .mobile-player{display:flex;position:relative;z-index:2;min-height:100svh;flex-direction:column;justify-content:flex-end;overflow:hidden;padding:clamp(22px,6vw,38px) 24px 28px;color:#fff}
+  .mobile-player[hidden]{display:none}
+  .mobile-player-art{position:absolute;inset:0;z-index:-2;background:#111;overflow:hidden}
+  .mobile-player-art img,.mobile-player-art video{position:absolute;inset:0;width:100%;height:72%;object-fit:cover}
+  .mobile-player-art video{display:none}
+  .mobile-player-art::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,transparent 32%,rgba(10,10,10,.12) 52%,rgba(10,10,10,.84) 78%,#111 100%)}
+  .mobile-player-info{margin-top:auto;text-shadow:0 2px 16px rgba(0,0,0,.4)}
+  .mobile-player-info h2{margin:0;font-size:clamp(1.75rem,8vw,2.55rem);line-height:1.08;letter-spacing:-.045em}
+  .mobile-player-info p{margin:7px 0 0;font-size:1.1rem;color:rgba(255,255,255,.78)}
+  .mobile-player-progress{margin:22px 0 18px}
+  .mobile-player-progress input{width:100%;accent-color:#fff}
+  .mobile-player-times{display:flex;justify-content:space-between;margin-top:5px;color:rgba(255,255,255,.7);font-size:.78rem;font-variant-numeric:tabular-nums}
+  .mobile-player-controls{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:6px 0 0}
+  .mobile-player-controls button{border:0;background:transparent;color:#fff;padding:8px;min-height:auto;width:56px;height:56px;display:grid;place-items:center}
+  .mobile-player-controls svg{width:38px;height:38px}
+  .mobile-player-controls .mobile-play{width:72px;height:72px}
+  .mobile-player-controls .mobile-play svg{width:58px;height:58px}
+}
 </style>
 </head>
 <body>
 <div id="dynamic-background" aria-hidden="true"><canvas id="kawarp-background"></canvas></div>
+<section class="mobile-player" id="mobile-player" hidden aria-label="Experimental mobile player">
+  <div class="mobile-player-art">
+    <img id="mobile-cover" alt="">
+    <video id="mobile-motion" muted loop playsinline></video>
+  </div>
+  <div class="mobile-player-info">
+    <h2 id="mobile-title">Nothing playing</h2>
+    <p><span id="mobile-artist"></span><span id="mobile-year"></span></p>
+  </div>
+  <div class="mobile-player-progress">
+    <input id="mobile-progress-bar" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek through track">
+    <div class="mobile-player-times"><span id="mobile-progress-current">0:00</span><span id="mobile-progress-duration">0:00</span></div>
+  </div>
+  <div class="mobile-player-controls">
+    <button id="mobile-previous" type="button" aria-label="Previous track"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z" fill="currentColor"/></svg></button>
+    <button id="mobile-play-pause" class="mobile-play" type="button" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z" fill="currentColor"/></svg></button>
+    <button id="mobile-next" type="button" aria-label="Next track"><svg viewBox="0 0 24 24"><path d="M18 5h-2v14h2zM4 5v14l11-7z" fill="currentColor"/></svg></button>
+  </div>
+</section>
 <div class="eyebrow">hi. hello. welcome.</div>
 <h1>lyric thing™</h1>
 <p>hi this uses AMLL and Spicy Lyrics hi do you like it hey answer meee. connect Spotify and let’s see what’s playing.</p>
