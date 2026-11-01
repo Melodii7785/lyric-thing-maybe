@@ -7,9 +7,9 @@ export default defineConfig({
     emptyOutDir: true,
     cssCodeSplit: false,
     rollupOptions: {
-      input: 'src/app.js',
+      input: { main: 'src/app.js', experimental: 'src/testing-app.js' },
       output: {
-        entryFileNames: 'app.js',
+        entryFileNames: (chunk) => chunk.name === 'experimental' ? 'testingthisisexperimental/app.js' : 'app.js',
         chunkFileNames: 'chunks/[name]-[hash].js',
         assetFileNames: (assetInfo) =>
           assetInfo.name?.endsWith('.css')
