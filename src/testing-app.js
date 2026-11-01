@@ -99,6 +99,19 @@ async function setAmbientBackground(imageUrl, force = false){
 }
 async function loadNowbarMotion(){
   const video=$('nowbar-motion');
+
+  // A new song starts with a clean slate. Otherwise the previous HLS stream
+  // happily keeps playing when the new song has no Album Motion. Rude.
+  if(nowbarMotionHls){
+    nowbarMotionHls.destroy();
+    nowbarMotionHls=null;
+  }
+  video.pause();
+  video.removeAttribute('src');
+  video.load();
+  video.style.display='none';
+  $('nowbar-cover').style.display='block';
+
   try{
     const response=await fetch('/api/apple-motion',{credentials:'same-origin'});
     if(!response.ok) throw new Error('no motion artwork');
@@ -134,7 +147,12 @@ async function loadNowbarMotion(){
       video.style.display='none';
       $('nowbar-cover').style.display='block';
     };
-  }catch{ /* static cover is the normal fallback */ }
+  }catch{
+    // No Album Motion for this song: the static cover we restored above stays.
+    video.pause();
+    video.style.display='none';
+    $('nowbar-cover').style.display='block';
+  }
 }
 
 function loadBeatAnalysis(trackId){
