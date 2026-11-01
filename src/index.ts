@@ -414,7 +414,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
       track: result.trackName ?? null,
       artist: result.artistName ?? null,
       album: result.collectionName ?? null,
-      artwork: result.artworkUrl100 ?? null,
+      artwork: typeof result.artworkUrl100 === "string"
+        ? result.artworkUrl100.replace(/100x100(?:bb)?/i, "1200x1200bb")
+        : null,
     }));
     return json({
       spotify: { title, artists, album },
