@@ -1,4 +1,5 @@
 import '@fontsource-variable/inter';
+import Hls from 'hls.js';
 // Keep the verified app.js fix on a fresh commit so CI can run again.
 import { LyricPlayer } from '@applemusic-like-lyrics/core';
 import '@applemusic-like-lyrics/core/style.css';
@@ -27,6 +28,7 @@ let kawarpLoading = null;
 let kawarpSourceUrl = '';
 let dynamicBackgroundEnabled = true;
 let ambientImageUrl = '';
+let nowbarMotionHls = null;
 let ambientRequestId = 0;
 let beatAnalysis = null;
 let beatAnalysisTrackId = null;
@@ -95,6 +97,64 @@ async function setAmbientBackground(imageUrl, force = false){
     console.warn('[Kawarp background failed]', error);
   }
 }
+async function loadNowbarMotion(){
+  const video=$('nowbar-motion');
+
+  // A new song starts with a clean slate. Otherwise the previous HLS stream
+  // happily keeps playing when the new song has no Album Motion. Rude.
+  if(nowbarMotionHls){
+    nowbarMotionHls.destroy();
+    nowbarMotionHls=null;
+  }
+  video.pause();
+  video.removeAttribute('src');
+  video.load();
+  video.style.display='none';
+  $('nowbar-cover').style.display='block';
+
+  try{
+    const response=await fetch('/api/apple-motion',{credentials:'same-origin'});
+    if(!response.ok) throw new Error('no motion artwork');
+    const motion=await response.json();
+    if(!motion.square) throw new Error('no square motion artwork');
+    if(nowbarMotionHls){ nowbarMotionHls.destroy(); nowbarMotionHls=null; }
+    // Prefer hls.js where possible. Some Chromium browsers say they "maybe"
+    // support HLS natively, then proceed to display absolutely nothing. Rude.
+    if(Hls.isSupported()){
+      nowbarMotionHls=new Hls();
+      nowbarMotionHls.on(Hls.Events.ERROR, (_event, data)=>{
+        if(data.fatal){
+          nowbarMotionHls?.destroy();
+          nowbarMotionHls=null;
+          video.style.display='none';
+          $('nowbar-cover').style.display='block';
+        }
+      });
+      nowbarMotionHls.loadSource(motion.square);
+      nowbarMotionHls.attachMedia(video);
+    }else if(video.canPlayType('application/vnd.apple.mpegurl')){
+      video.src=motion.square;
+    }else throw new Error('HLS not supported');
+
+    video.muted=true; video.loop=true; video.playsInline=true;
+    // Keep the normal cover visible until we have an actual video frame.
+    video.onloadeddata=()=>{
+      video.style.display='block';
+      $('nowbar-cover').style.display='none';
+      video.play().catch(()=>{});
+    };
+    video.onerror=()=>{
+      video.style.display='none';
+      $('nowbar-cover').style.display='block';
+    };
+  }catch{
+    // No Album Motion for this song: the static cover we restored above stays.
+    video.pause();
+    video.style.display='none';
+    $('nowbar-cover').style.display='block';
+  }
+}
+
 function loadBeatAnalysis(trackId){
   if(!trackId || !/^[A-Za-z0-9]{22}$/.test(trackId)){
     beatAnalysis = null;
@@ -463,6 +523,7 @@ async function playback(){
         void nowbarCover.offsetWidth;
         nowbarCover.src=newImage;
         nowbarCover.classList.add('art-changing');
+        loadNowbarMotion();
       }
     } else $('cover').style.display='none';
     latestProgressMs=Number(data.progressMs||0);
