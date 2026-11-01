@@ -415,7 +415,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
       artist: result.artistName ?? null,
       album: result.collectionName ?? null,
       artwork: typeof result.artworkUrl100 === "string"
-        ? result.artworkUrl100.replace(/100x100(?:bb)?/i, "1200x1200bb")
+        ? result.artworkUrl100.replace(/100x100(?:bb)?/i, "1500x1500bb")
         : null,
     }));
     return json({
