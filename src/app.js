@@ -97,6 +97,26 @@ async function setAmbientBackground(imageUrl, force = false){
     console.warn('[Kawarp background failed]', error);
   }
 }
+async function loadNowbarAppleCover(trackId){
+  try{
+    const response=await fetch('/api/apple-cover',{credentials:'same-origin'});
+    if(!response.ok) throw new Error('Apple cover lookup failed');
+    const data=await response.json();
+    // The Worker returns 1200×1200 specifically for the NowBar. Don't let a
+    // slower lookup from the previous song replace the current cover.
+    if(trackId !== currentTrackId) return;
+    const appleCover=data?.best?.artwork;
+    if(!appleCover) return;
+    const nowbarCover=$('nowbar-cover');
+    nowbarCover.classList.remove('art-changing');
+    void nowbarCover.offsetWidth;
+    nowbarCover.src=appleCover;
+    nowbarCover.classList.add('art-changing');
+  }catch(error){
+    console.warn('[Apple NowBar cover failed; keeping Spotify cover]',error);
+  }
+}
+
 async function loadNowbarMotion(){
   const video=$('nowbar-motion');
 
@@ -501,7 +521,7 @@ async function playback(){
     const nextTrackId = data.track.id || `${data.track.title}::${(data.track.artists || []).join(', ')}`;
     const trackChanged = nextTrackId !== currentTrackId;
     currentTrackId = nextTrackId;
-    if(trackChanged){ beatAnalysis = null; beatAnalysisTrackId = null; beatPulse = 0; }
+    if(trackChanged){ void loadNowbarAppleCover(nextTrackId); beatAnalysis = null; beatAnalysisTrackId = null; beatPulse = 0; }
     loadBeatAnalysis(data.track.id);
     $('track').hidden=false;
     $('title').textContent=data.track.title;
