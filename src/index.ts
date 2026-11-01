@@ -297,6 +297,48 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return new Response(image.body, { status: 200, headers });
   }
 
+  if (path === "/api/apple-motion" && request.method === "GET") {
+    let session = await getSession(request, env);
+    if (!session) return json({ error: "not_connected" }, 401);
+    try { session = await refresh(session, env); }
+    catch { return json({ error: "spotify_reconnect_required" }, 401); }
+
+    const playbackResponse = await fetch(API_URL + "/me/player/currently-playing", {
+      headers: { authorization: "Bearer " + await decrypt(env, session.access_token_enc), accept: "application/json" },
+    });
+    if (playbackResponse.status === 204 || playbackResponse.status === 202) return json({ error: "nothing_playing" }, 404);
+    if (!playbackResponse.ok) return json({ error: "spotify_request_failed", status: playbackResponse.status }, 502);
+    const playback = await playbackResponse.json() as any;
+    const track = playback?.item;
+    if (!track) return json({ error: "nothing_playing" }, 404);
+
+    const artist = String(track.artists?.[0]?.name || "");
+    const album = String(track.album?.name || "");
+    const title = String(track.name || "");
+    if (!artist || !album) return json({ error: "not_enough_metadata" }, 400);
+
+    const motionUrl = new URL("https://artwork.m8tec.top/api/v1/artwork/search");
+    motionUrl.search = new URLSearchParams({ artist, album, ...(title ? { title } : {}) }).toString();
+    const cache = caches.default;
+    const cacheKey = new Request("https://lyricthing-cache.invalid/apple-motion?" + motionUrl.searchParams.toString());
+    const cached = await cache.match(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const response = await fetch(motionUrl.toString(), { headers: { accept: "application/json" } });
+      if (!response.ok) return json({ error: "apple_motion_search_failed", status: response.status }, 502);
+      const data = await response.json() as any;
+      const square = data?.square ?? data?.Square ?? data?.artwork?.square ?? null;
+      const squareUrl = square?.m3u8 ?? square?.url ?? square?.streamUrl ?? data?.squareUrl ?? data?.m3u8 ?? null;
+      const payload = { square: squareUrl, raw: square ? undefined : undefined };
+      const out = json(payload);
+      if (squareUrl) await cache.put(cacheKey, out.clone());
+      return out;
+    } catch {
+      return json({ error: "apple_motion_unavailable" }, 502);
+    }
+  }
+
   if (path === "/api/apple-cover" && request.method === "GET") {
     let session = await getSession(request, env);
     if (!session) return json({ error: "not_connected" }, 401);
