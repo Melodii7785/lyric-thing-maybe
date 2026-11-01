@@ -105,12 +105,35 @@ async function loadNowbarMotion(){
     const motion=await response.json();
     if(!motion.square) throw new Error('no square motion artwork');
     if(nowbarMotionHls){ nowbarMotionHls.destroy(); nowbarMotionHls=null; }
-    if(video.canPlayType('application/vnd.apple.mpegurl')) video.src=motion.square;
-    else if(Hls.isSupported()){ nowbarMotionHls=new Hls(); nowbarMotionHls.loadSource(motion.square); nowbarMotionHls.attachMedia(video); }
-    else throw new Error('HLS not supported');
-    video.muted=true; video.loop=true; video.playsInline=true; video.style.display='block';
-    await video.play().catch(()=>{});
-    $('nowbar-cover').style.display='none';
+    // Prefer hls.js where possible. Some Chromium browsers say they "maybe"
+    // support HLS natively, then proceed to display absolutely nothing. Rude.
+    if(Hls.isSupported()){
+      nowbarMotionHls=new Hls();
+      nowbarMotionHls.on(Hls.Events.ERROR, (_event, data)=>{
+        if(data.fatal){
+          nowbarMotionHls?.destroy();
+          nowbarMotionHls=null;
+          video.style.display='none';
+          $('nowbar-cover').style.display='block';
+        }
+      });
+      nowbarMotionHls.loadSource(motion.square);
+      nowbarMotionHls.attachMedia(video);
+    }else if(video.canPlayType('application/vnd.apple.mpegurl')){
+      video.src=motion.square;
+    }else throw new Error('HLS not supported');
+
+    video.muted=true; video.loop=true; video.playsInline=true;
+    // Keep the normal cover visible until we have an actual video frame.
+    video.onloadeddata=()=>{
+      video.style.display='block';
+      $('nowbar-cover').style.display='none';
+      video.play().catch(()=>{});
+    };
+    video.onerror=()=>{
+      video.style.display='none';
+      $('nowbar-cover').style.display='block';
+    };
   }catch{ /* static cover is the normal fallback */ }
 }
 
