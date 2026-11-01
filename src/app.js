@@ -7,6 +7,7 @@ import '@applemusic-like-lyrics/core/style.css';
 const $ = id => document.getElementById(id);
 let poller = null;
 let currentTrackId = null;
+let currentAppleTrack = null;
 let lyricRequestId = 0;
 let lyricLines = [];
 let lyricsAreSynced = false;
@@ -254,7 +255,15 @@ function setAttribution(source, uploadAttribution){
   const provider=names[source] || 'Unknown source';
   target.append('Lyrics provided by ');
   const providerLink=document.createElement('a');
-  providerLink.href=source==='lrc.red'?'https://lrc.red/':source==='spicy_lyrics'?'https://spicylyrics.org/': 'https://developers.spicylyrics.org/';
+  // Apple Music attribution should lead to the actual track we already found
+  // through the iTunes lookup, not the generic developer site.
+  providerLink.href=source==='apple_music'
+    ? (currentAppleTrack?.trackViewUrl || 'https://music.apple.com/')
+    : source==='lrc.red'
+      ? 'https://lrc.red/'
+      : source==='spicy_lyrics'
+        ? 'https://spicylyrics.org/'
+        : 'https://developers.spicylyrics.org/';
   providerLink.target='_blank'; providerLink.rel='noreferrer'; providerLink.style.color='#f49ac2'; providerLink.textContent=provider;
   target.append(providerLink);
   if(source==='spicy_lyrics' && uploadAttribution){
@@ -545,6 +554,7 @@ async function playback(){
       searchAppleCoverDirect(data.track)
         .then(result => {
           console.log('[Apple cover test]', result);
+          if(nextTrackId === currentTrackId) currentAppleTrack = result || null;
           const appleArtwork = result?.artworkUrlLarge || result?.artworkUrl100;
           if(appleArtwork){
             // One Apple lookup, two jobs: Kawarp keeps its 1500px source and
