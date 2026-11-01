@@ -158,7 +158,8 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
   #lyrics{grid-column:1;grid-row:3;min-width:0}
   #lyrics-attribution{grid-column:1}
   .nowbar{display:block!important;grid-column:2;grid-row:3;position:sticky;top:48px;width:100%;text-align:center;align-self:start}
-  .nowbar img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:0;background:#222;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+  .nowbar img,.nowbar video{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:0;background:#222;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+  .nowbar video{display:none}
   .nowbar img.art-changing{animation:nowbar-art-in .42s cubic-bezier(.2,.8,.2,1)}
   @keyframes nowbar-art-in{from{opacity:0;transform:translateX(-48px)}to{opacity:1;transform:translateX(0)}}
   .nowbar h2{margin:28px 0 4px;font-size:clamp(1.5rem,2.2vw,2.25rem);line-height:1.15;letter-spacing:-.035em;color:#fff}
@@ -232,6 +233,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
     <p id="lyrics-meta">the lyrics are in the microwave. one moment…</p>
     <aside class="nowbar" id="nowbar" hidden aria-label="Now playing">
       <img id="nowbar-cover" alt="Album cover">
+      <video id="nowbar-motion" muted loop playsinline aria-label="Animated album cover"></video>
       <h2 id="nowbar-title">Nothing playing</h2>
       <p id="nowbar-artist"></p>
     </aside>
