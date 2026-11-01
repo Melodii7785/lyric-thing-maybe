@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111111">
+<meta name="description" content="hi. it finds lyrics for whatever Spotify is playing. please work.">
+<title>lyric thing™ — EXPERIMENTAL</title>
+<link rel="stylesheet" href="/amll.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap" rel="stylesheet">
+<style>
+/* Replace this example with your actual font details when you're ready. */
+@font-face {
+  font-family: "SF Pro Display";
+  font-style: normal;
+  font-weight: 600;
+  src: url("https://raw.githubusercontent.com/blaisck/sfwin/master/SFPro/TrueType/SFProDisplay-SemiBold.ttf");
+  format("ttf");
+}
+:root{
+  color-scheme:dark;
+  font-family:Inter,Arial,Helvetica,sans-serif;
+  background:#111;
+  color:#eee;
+  --bg:#111;
+  --surface:#181818;
+  --line:#383838;
+  --text:#eee;
+  --amll-unfocused:#fff;
+  --muted:#aaa;
+  --dim:#777;
+  --accent:#d9273f;
+  --accent-hot:#FF0436;
+}
+*{box-sizing:border-box}
+html{background:var(--bg);scrollbar-color:#444 var(--bg)}
+body{
+  margin:0 auto;
+  max-width:980px;
+  min-height:100vh;
+  padding:clamp(20px,4vw,42px);
+  background:transparent;
+  color:var(--text);
+  font-family:inherit;
+  font-size:16px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+#dynamic-background{position:fixed;inset:0;z-index:0;overflow:hidden;background:#111;pointer-events:none}
+#dynamic-background canvas{width:100%;height:100%;display:block;opacity:.72;transition:opacity .35s ease}
+#dynamic-background.off canvas{opacity:0}
+body::before{content:"";position:fixed;inset:0;z-index:0;background:rgba(10,10,12,.42);pointer-events:none}
+body > :not(#dynamic-background){position:relative;z-index:1}
+.eyebrow{
+  color:var(--accent-hot);
+  font-size:.75rem;
+  font-weight:800;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+h1{
+  margin:12px 0 18px;
+  font-size:clamp(2.6rem,8vw,5.5rem);
+  line-height:.95;
+  letter-spacing:-.065em;
+  font-weight:850;
+  color:#e5e5e5;
+}
+body>p{color:var(--muted);line-height:1.65}
+.panel{margin-top:26px;padding:0;background:transparent;border:0;border-radius:0;box-shadow:none}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
+button{
+  min-height:42px;
+  padding:10px 15px;
+  border:1px solid var(--accent);
+  border-radius:0;
+  background:var(--accent);
+  color:#fff;
+  font:inherit;
+  font-weight:750;
+  cursor:pointer;
+  transition:background-color .15s ease,border-color .15s ease,filter .15s ease;
+}
+button:hover{filter:brightness(1.12)}
+button:active{filter:brightness(.9)}
+button.secondary{background:transparent;color:var(--text);border-color:#555}
+button.secondary:hover{border-color:var(--accent-hot);color:#fff}
+button:disabled{opacity:.5;cursor:wait}
+#status{margin:16px 0;color:var(--muted);font-size:.9rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.pill{
+  display:inline-block;
+  padding:4px 0;
+  border:0;
+  border-bottom:2px solid var(--accent);
+  border-radius:0;
+  color:var(--text);
+  font-size:.78rem;
+  font-weight:800;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.track{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin-top:18px;
+  padding:14px 0;
+  border-radius:0;
+  background:transparent;
+  border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+}
+.track>div{min-width:0}
+#cover{display:none;width:72px;height:72px;object-fit:cover;border-radius:0;background:#222;box-shadow:none}
+.track h2{margin:0 0 5px;font-size:1.2rem;line-height:1.25;overflow-wrap:anywhere;color:#f1f1f1}
+.track p{margin:0;color:var(--muted);line-height:1.45}
+.nowbar{display:none}
+.muted{color:var(--muted);font-size:.82rem}
+#lyrics-panel{margin-top:28px;padding-top:20px;border-top:3px solid #eee}
+#lyrics-panel h2{margin:0;font-size:1.5rem;letter-spacing:-.04em;line-height:1.2;color:#e5e5e5}
+#lyrics{position:relative;height:clamp(320px,58vh,680px);max-height:68vh;margin-top:18px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:4px 0;scrollbar-color:#444 transparent;scrollbar-width:thin}
+#lyrics .amll-lyric-player{width:100%;height:100%;background:transparent;color:var(--amll-unfocused);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","SF Pro Display","Roboto Flex",Inter,Arial,Helvetica,sans-serif!important;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+#lyrics .amll-lyric-player *{font-family:inherit!important}
+#lyrics .amll-lyric-player{--amll-lp-color:var(--amll-unfocused)!important;--amll-lp-highlight-color:var(--accent-hot)!important;color:var(--amll-unfocused)!important}
+/* AMLL fades unfocused lines with opacity, so give them a brighter base before the fade.
+   The active line still gets the Spicy-ish red treatment below. */
+#lyrics .amll-lyric-player [style*="opacity"]{color:var(--amll-unfocused)!important}
+#lyrics .amll-lyric-player [class*="active"],
+#lyrics .amll-lyric-player [class*="highlight"],
+#lyrics .amll-lyric-player [class*="current"],
+#lyrics .amll-lyric-player [style*="color: rgb(255, 255, 255)"],
+#lyrics .amll-lyric-player [style*="color: rgb(255,255,255)"]{color:var(--accent-hot)!important}
+#lyrics-meta{color:var(--muted);font-size:.8rem}
+#lyrics-attribution{margin-top:18px;padding-top:12px;border-top:1px solid #444;font-size:.78rem;line-height:1.7;color:var(--muted)}
+a{color:var(--accent-hot)}
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent-hot);outline-offset:3px}
+.device-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:18px 0 10px}
+.device-row label{font-size:.82rem;color:var(--muted);font-weight:750}
+.device-row select{flex:1 1 180px;min-width:0;min-height:42px;padding:10px;background:#1b1b1b;color:var(--text);border:1px solid #555;border-radius:0;font:inherit}
+.playback-actions{display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0}
+.playback-actions button{width:42px;height:42px;min-height:42px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:1.2rem;line-height:1}
+.playback-actions svg{width:21px;height:21px;display:block}
+.playback-actions #play-pause svg{width:24px;height:24px}
+.playback-actions #play-pause{width:48px;height:48px;font-size:1.45rem}
+.playback-actions button[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.progress-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;margin-top:10px;color:var(--muted);font-size:.75rem;font-variant-numeric:tabular-nums}
+#progress-bar{width:100%;accent-color:var(--accent);cursor:pointer}
+#progress-bar:disabled{opacity:.45;cursor:default}
+#device-status{margin:6px 0 14px;color:var(--muted)}
+@media(min-width:901px){
+  body{max-width:1440px}
+  .track{display:none!important}
+  #lyrics-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,460px);column-gap:clamp(100px,12vw,220px);align-items:start;max-width:1380px}
+  #lyrics-panel>h2,#lyrics-panel>#lyrics-meta{grid-column:1}
+  #lyrics{grid-column:1;grid-row:3;min-width:0}
+  #lyrics-attribution{grid-column:1}
+  .nowbar{display:block!important;grid-column:2;grid-row:3;position:sticky;top:48px;width:100%;text-align:center;align-self:start}
+  .nowbar img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:0;background:#222;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+  .nowbar img.art-changing{animation:nowbar-art-in .42s cubic-bezier(.2,.8,.2,1)}
+  @keyframes nowbar-art-in{from{opacity:0;transform:translateX(-48px)}to{opacity:1;transform:translateX(0)}}
+  .nowbar h2{margin:28px 0 4px;font-size:clamp(1.5rem,2.2vw,2.25rem);line-height:1.15;letter-spacing:-.035em;color:#fff}
+  .nowbar p{margin:0;color:#ddd;font-size:1.05rem}
+}
+@media(max-width:900px){
+  .nowbar{display:none}
+}
+@media(max-width:600px){
+  body{padding:22px 16px}
+  .track{gap:12px;padding:12px 0}
+  #cover{width:64px;height:64px}
+  .actions button{flex:1 1 auto}
+  #lyrics{height:55vh;max-height:65vh}
+}
+@media(prefers-reduced-motion:reduce){button{transition:none}}
+</style>
+</head>
+<body>
+<div id="dynamic-background" aria-hidden="true"><canvas id="kawarp-background"></canvas></div>
+<div class="eyebrow">hi. hello. welcome.</div>
+<h1>lyric thing™</h1>
+<p>hi this uses AMLL and Spicy Lyrics hi do you like it hey answer meee. connect Spotify and let’s see what’s playing.</p>
+<section class="panel">
+  <span class="pill" id="connection">not connected</span>
+  <div class="actions">
+    <button id="connect">connect spotify!!</button>
+    <button class="secondary" id="check">what is playing. tell me.</button>
+    <button class="secondary" id="find-lyrics" hidden>get me the WORDS</button>
+    <button class="secondary" id="disconnect">disconnect (bye i guess)</button>
+    <button class="secondary" id="dynamic-background-toggle" aria-pressed="true">fancy background: on</button>
+    <button class="secondary" id="refresh-fancy-background" type="button">refresh my fancy background</button>
+  </div>
+  <div id="connect-controls" hidden>
+    <div class="device-row">
+      <label for="spotify-device">where are we playing this</label>
+      <select id="spotify-device" aria-label="Spotify playback device"></select>
+      <button class="secondary" id="refresh-devices" type="button">look again</button>
+    </div>
+    <div class="actions playback-actions" aria-label="Spotify playback controls">
+      <button class="secondary" id="previous-track" type="button" aria-label="Previous track" title="Previous track">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z" fill="currentColor"/></svg>
+      </button>
+      <button id="play-pause" type="button" aria-label="Play" title="Play">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>
+      </button>
+      <button class="secondary" id="next-track" type="button" aria-label="Next track" title="Next track">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5h-2v14h2zM4 5v14l11-7z" fill="currentColor"/></svg>
+      </button>
+      <button class="secondary" id="shuffle-toggle" type="button" aria-label="Shuffle off" title="Shuffle" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3h4v4h-2V6h-1.5a4 4 0 0 0-3.2 1.6l-5.6 8A6 6 0 0 1 3.8 18H3v-2h.8a4 4 0 0 0 3.2-1.6l5.6-8A6 6 0 0 1 17.5 4H19V3zM17 14h2v-1h2v4h-4v-2h-1v-1zM3 6h.8a6 6 0 0 1 4.9 2.5l1.2 1.7-1.2 1.7-1.6-2.2A4 4 0 0 0 3.8 8H3zM17 18h1.5a4 4 0 0 0 1.5-.3v2.1a6 6 0 0 1-1.5.2H17a6 6 0 0 1-3.6-1.2l1.2-1.7A4 4 0 0 0 17 18z" fill="currentColor"/></svg>
+      </button>
+      <button class="secondary" id="repeat-toggle" type="button" aria-label="Repeat off" title="Repeat off" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-2-2 1.4-1.4L22 8l-4.6 4.4L16 11l2-2H7a2 2 0 0 0-2 2v2H3v-2a4 4 0 0 1 4-4zm10 10H6l2 2-1.4 1.4L2 16l4.6-4.4L8 13l-2 2h11a2 2 0 0 0 2-2v-2h2v2a4 4 0 0 1-4 4z" fill="currentColor"/></svg>
+      </button>
+    </div>
+    <div class="progress-row">
+      <span id="progress-current">0:00</span>
+      <input id="progress-bar" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek through track" disabled>
+      <span id="progress-duration">0:00</span>
+    </div>
+    <p class="muted" id="device-status">pick a device. i cannot read minds. yet.</p>
+  </div>
+  <div id="status" role="status" aria-live="polite">Checking connection…</div>
+  <div class="track" id="track" hidden>
+    <img id="cover" alt="Album cover">
+    <div><h2 id="title">Nothing playing</h2><p id="artist"></p><p class="muted" id="album"></p><p class="muted" id="playstate"></p></div>
+  </div>
+  <div id="lyrics-panel" hidden>
+    <h2>THE WORDS™</h2>
+    <p id="lyrics-meta">the lyrics are in the microwave. one moment…</p>
+    <aside class="nowbar" id="nowbar" hidden aria-label="Now playing">
+      <img id="nowbar-cover" alt="Album cover">
+      <h2 id="nowbar-title">Nothing playing</h2>
+      <p id="nowbar-artist"></p>
+    </aside>
+    <div id="lyrics" aria-live="polite"></div>
+    <p class="muted" id="lyrics-attribution">credit where credit is due!!</p>
+  </div>
+</section>
+<p class="muted">made with AMLL + Spicy Lyrics + questionable amounts of hope. lyrics may be synced, unsynced, or simply not here. technology!!</p>
+<script type="module" src="/testingthisisexperimental/app.js"></script>
+</body>
+</html>
