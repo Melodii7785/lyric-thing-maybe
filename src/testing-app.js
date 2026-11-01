@@ -1,4 +1,5 @@
 import '@fontsource-variable/inter';
+import Hls from 'hls.js';
 // Keep the verified app.js fix on a fresh commit so CI can run again.
 import { LyricPlayer } from '@applemusic-like-lyrics/core';
 import '@applemusic-like-lyrics/core/style.css';
@@ -27,6 +28,7 @@ let kawarpLoading = null;
 let kawarpSourceUrl = '';
 let dynamicBackgroundEnabled = true;
 let ambientImageUrl = '';
+let nowbarMotionHls = null;
 let ambientRequestId = 0;
 let beatAnalysis = null;
 let beatAnalysisTrackId = null;
@@ -95,6 +97,23 @@ async function setAmbientBackground(imageUrl, force = false){
     console.warn('[Kawarp background failed]', error);
   }
 }
+async function loadNowbarMotion(){
+  const video=$('nowbar-motion');
+  try{
+    const response=await fetch('/api/apple-motion',{credentials:'same-origin'});
+    if(!response.ok) throw new Error('no motion artwork');
+    const motion=await response.json();
+    if(!motion.square) throw new Error('no square motion artwork');
+    if(nowbarMotionHls){ nowbarMotionHls.destroy(); nowbarMotionHls=null; }
+    if(video.canPlayType('application/vnd.apple.mpegurl')) video.src=motion.square;
+    else if(Hls.isSupported()){ nowbarMotionHls=new Hls(); nowbarMotionHls.loadSource(motion.square); nowbarMotionHls.attachMedia(video); }
+    else throw new Error('HLS not supported');
+    video.muted=true; video.loop=true; video.playsInline=true; video.style.display='block';
+    await video.play().catch(()=>{});
+    $('nowbar-cover').style.display='none';
+  }catch{ /* static cover is the normal fallback */ }
+}
+
 function loadBeatAnalysis(trackId){
   if(!trackId || !/^[A-Za-z0-9]{22}$/.test(trackId)){
     beatAnalysis = null;
@@ -463,6 +482,7 @@ async function playback(){
         void nowbarCover.offsetWidth;
         nowbarCover.src=newImage;
         nowbarCover.classList.add('art-changing');
+        loadNowbarMotion();
       }
     } else $('cover').style.display='none';
     latestProgressMs=Number(data.progressMs||0);
