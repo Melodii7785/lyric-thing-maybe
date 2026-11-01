@@ -516,12 +516,15 @@ async function playback(){
     if(data.track.image){
       $('cover').src=data.track.image;
       $('cover').style.display='block';
-      const nowbarCover=$('nowbar-cover');
-      const newImage=data.track.image;
-      if(nowbarCover.src !== newImage){
+
+      // Don't re-apply Spotify's cover on every playback poll. The Apple
+      // lookup may have already upgraded the NowBar artwork for this track.
+      // Only give Spotify's image the initial/fallback job when the track changes.
+      if(trackChanged){
+        const nowbarCover=$('nowbar-cover');
         nowbarCover.classList.remove('art-changing');
         void nowbarCover.offsetWidth;
-        nowbarCover.src=newImage;
+        nowbarCover.src=data.track.image;
         nowbarCover.classList.add('art-changing');
         loadNowbarMotion();
       }
