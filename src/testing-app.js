@@ -29,6 +29,7 @@ let kawarpSourceUrl = '';
 let dynamicBackgroundEnabled = true;
 let ambientImageUrl = '';
 let nowbarMotionHls = null;
+let mobileMotionHls = null;
 let ambientRequestId = 0;
 let beatAnalysis = null;
 let beatAnalysisTrackId = null;
@@ -97,6 +98,35 @@ async function setAmbientBackground(imageUrl, force = false){
     console.warn('[Kawarp background failed]', error);
   }
 }
+async function loadMobileMotion(){
+  const video=$('mobile-motion');
+  if(!video) return;
+  if(mobileMotionHls){ mobileMotionHls.destroy(); mobileMotionHls=null; }
+  video.pause(); video.removeAttribute('src'); video.load(); video.style.display='none';
+  $('mobile-cover').style.display='block';
+  try{
+    const response=await fetch('/api/apple-motion',{credentials:'same-origin'});
+    if(!response.ok) throw new Error('no motion artwork');
+    const motion=await response.json();
+    // This is the whole point of the experiment: use Apple's tall variant.
+    if(!motion.tall) throw new Error('no tall motion artwork');
+    if(Hls.isSupported()){
+      mobileMotionHls=new Hls();
+      mobileMotionHls.on(Hls.Events.ERROR,(_event,data)=>{
+        if(data.fatal){ mobileMotionHls?.destroy(); mobileMotionHls=null; video.style.display='none'; $('mobile-cover').style.display='block'; }
+      });
+      mobileMotionHls.loadSource(motion.tall);
+      mobileMotionHls.attachMedia(video);
+    }else if(video.canPlayType('application/vnd.apple.mpegurl')) video.src=motion.tall;
+    else throw new Error('HLS not supported');
+    video.muted=true; video.loop=true; video.playsInline=true;
+    video.onloadeddata=()=>{ video.style.display='block'; $('mobile-cover').style.display='none'; video.play().catch(()=>{}); };
+    video.onerror=()=>{ video.style.display='none'; $('mobile-cover').style.display='block'; };
+  }catch{
+    video.pause(); video.style.display='none'; $('mobile-cover').style.display='block';
+  }
+}
+
 async function loadNowbarMotion(){
   const video=$('nowbar-motion');
 
@@ -398,6 +428,13 @@ let shuffleEnabled = false;
 let repeatState = 'off';
 let trackDurationMs = 0;
 let seekingProgress = false;
+function updateMobileProgress(){
+  const bar=$('mobile-progress-bar'); if(!bar) return;
+  const p=Math.min(trackDurationMs,Math.max(0,currentPlaybackSeconds()*1000));
+  if(!bar.matches(':active')) bar.value=trackDurationMs?String(Math.round(p/trackDurationMs*1000)):'0';
+  $('mobile-progress-current').textContent=formatTime(p);
+  $('mobile-progress-duration').textContent=formatTime(trackDurationMs);
+}
 function formatTime(ms){const s=Math.max(0,Math.floor((Number(ms)||0)/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
 function renderProgress(){const bar=$('progress-bar');if(!bar)return;const p=Math.min(trackDurationMs,Math.max(0,currentPlaybackSeconds()*1000));if(!seekingProgress)bar.value=trackDurationMs?String(Math.round(p/trackDurationMs*1000)):'0';bar.disabled=!trackDurationMs;$('progress-current').textContent=formatTime(p);$('progress-duration').textContent=formatTime(trackDurationMs);}
 function selectedDevice(){
@@ -513,11 +550,19 @@ async function playback(){
     $('playstate').textContent=data.playing ? 'Playing' : 'Paused';
     $('play-pause').innerHTML=data.playing?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM15 5h3v14h-3z" fill="currentColor"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>';
     $('play-pause').setAttribute('aria-label',data.playing?'Pause':'Play');
+    $('mobile-play-pause').innerHTML=data.playing?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM15 5h3v14h-3z" fill="currentColor"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>';
+    $('mobile-play-pause').setAttribute('aria-label',data.playing?'Pause':'Play');
+    if($('mobile-player')) $('mobile-player').hidden=false;
+    $('mobile-title').textContent=data.track.title;
+    $('mobile-artist').textContent=(data.track.artists||[]).join(', ') || 'Unknown artist';
+    $('mobile-year').textContent=data.track.year ? ' · '+data.track.year : '';
     if(data.track.image){
       $('cover').src=data.track.image;
       $('cover').style.display='block';
       const nowbarCover=$('nowbar-cover');
       const newImage=data.track.image;
+      const mobileCover=$('mobile-cover');
+      if(mobileCover.src !== newImage){ mobileCover.src=newImage; loadMobileMotion(); }
       if(nowbarCover.src !== newImage){
         nowbarCover.classList.remove('art-changing');
         void nowbarCover.offsetWidth;
@@ -532,6 +577,7 @@ async function playback(){
     if(typeof data.shuffleState==='boolean'){shuffleEnabled=data.shuffleState;$('shuffle-toggle').setAttribute('aria-pressed',String(shuffleEnabled));}
     if(['off','context','track'].includes(data.repeatState)){repeatState=data.repeatState;$('repeat-toggle').setAttribute('aria-pressed',String(repeatState!=='off'));$('repeat-toggle').setAttribute('aria-label','Repeat '+repeatState);$('repeat-toggle').title='Repeat '+repeatState;}
     renderProgress();
+    updateMobileProgress();
     isPlaying=!!data.playing;
     if(amllPlayer){
       amllPlayer.setCurrentTime(Math.round(latestProgressMs),true);
@@ -611,6 +657,10 @@ $('check').onclick=playback;
 $('refresh-devices').onclick=loadDevices;
 $('spotify-device').onchange=()=>{selectedDeviceId=$('spotify-device').value;const device=availableDevices.find(item=>item.id===selectedDeviceId);if(device)$('device-status').textContent='Selected '+device.name+'.';};
 $('play-pause').onclick=()=>playerCommand(isPlaying?'pause':'play');
+$('mobile-play-pause').onclick=()=>playerCommand(isPlaying?'pause':'play');
+$('mobile-previous').onclick=()=>playerCommand('previous');
+$('mobile-next').onclick=()=>playerCommand('next');
+$('mobile-progress-bar').addEventListener('change',async()=>{const position=Math.round(Number($('mobile-progress-bar').value)/1000*trackDurationMs);try{await api('/api/spotify/player/seek',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({position_ms:position,device_id:selectedDevice()||undefined})});latestProgressMs=position;progressObservedAt=Date.now();}catch(error){$('device-status').textContent='could not skip to that bit: '+error.message+' :(';}});
 $('previous-track').onclick=()=>playerCommand('previous');
 $('next-track').onclick=()=>playerCommand('next');
 $('shuffle-toggle').onclick=()=>playerCommand('shuffle',{state:!shuffleEnabled});
@@ -640,6 +690,7 @@ function animateAMLL(frameTime){
   if(amllPlayer){
     amllPlayer.setCurrentTime(Math.round(currentPlaybackSeconds()*1000));
     renderProgress();
+    updateMobileProgress();
     amllPlayer.update(delta);
   }
   updateBeatPulse();
