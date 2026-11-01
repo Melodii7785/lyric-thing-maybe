@@ -266,6 +266,17 @@ function setAttribution(source, uploadAttribution){
         : 'https://developers.spicylyrics.org/';
   providerLink.target='_blank'; providerLink.rel='noreferrer'; providerLink.style.color='#f49ac2'; providerLink.textContent=provider;
   target.append(providerLink);
+
+  // Community lyrics can still point people to the matched Apple Music track.
+  if(source==='spicy_lyrics' && currentAppleTrack?.trackViewUrl){
+    target.append(' · ');
+    const appleLink=document.createElement('a');
+    appleLink.href=currentAppleTrack.trackViewUrl;
+    appleLink.target='_blank'; appleLink.rel='noreferrer';
+    appleLink.style.color='#f49ac2';
+    appleLink.textContent='View on Apple Music';
+    target.append(appleLink);
+  }
   if(source==='spicy_lyrics' && uploadAttribution){
     const addCredit=(label,person)=>{
       if(!person || !person.username) return;
