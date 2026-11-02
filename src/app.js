@@ -328,7 +328,7 @@ async function searchAppleCoverDirect(track){
     : albumMatch?.artworkUrl100 ? albumMatch
     : best;
   if (artworkSource?.artworkUrl100) {
-    best.artworkUrlLarge = artworkSource.artworkUrl100.replace(/\\d+x\\d+(bb)?/i, '3000x3000bb');
+    best.artworkUrlLarge = artworkSource.artworkUrl100.replace(/\d+x\d+(bb)?/i, '3000x3000bb');
   }
   best.albumArtworkSource = exactAlbum?.artworkUrl100 ? 'spotify-album-collection-id'
     : albumMatch?.artworkUrl100 ? 'spotify-album-search'
