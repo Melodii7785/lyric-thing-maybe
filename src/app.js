@@ -185,7 +185,7 @@ function setDynamicBackgroundEnabled(enabled){
   if(enabled && ambientImageUrl) void setAmbientBackground(ambientImageUrl, true);
 }
 // Tiny Apple-cover experiment: Apple documents JSONP callbacks for cross-site Search API requests.
-function searchAppleCatalog(track, entity){
+function searchAppleCatalog(track, entity, term = [track.title, (track.artists || [])[0], track.album].filter(Boolean).join(' ')){
   return new Promise((resolve, reject) => {
     const callback = '__appleCover_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const script = document.createElement('script');
@@ -208,7 +208,7 @@ function searchAppleCatalog(track, entity){
       reject(new Error('apple_cover_load_failed'));
     };
     const params = new URLSearchParams({
-      term: [track.title, (track.artists || [])[0], track.album].filter(Boolean).join(' '),
+      term,
       country: 'BR',
       media: 'music',
       entity,
@@ -242,10 +242,37 @@ async function searchAppleCoverDirect(track){
   const wantedArtist = normalize((track.artists || [])[0]);
   const wantedAlbum = normalize(track.album);
   const wantedTitle = normalize(track.title);
+  const artistQuery = (track.artists || [])[0] || '';
 
-  // First find the exact song. Its collectionId identifies the actual release,
-  // even when the artist has multiple albums with the same title.
-  const songResults = await searchAppleCatalog(track, 'song');
+  // Search all three catalog entity types. The artist result helps verify
+  // identity; the song result gives us the exact collectionId; album search
+  // remains a fallback for incomplete song metadata.
+  const [songResults, albumResults, artistResults] = await Promise.all([
+    searchAppleCatalog(track, 'song', [track.title, artistQuery].filter(Boolean).join(' ')),
+    searchAppleCatalog(track, 'album', [track.album, artistQuery].filter(Boolean).join(' ')).catch(error => {
+      console.warn('[Apple album search failed]', error);
+      return [];
+    }),
+    artistQuery
+      ? searchAppleCatalog(track, 'musicArtist', artistQuery).catch(error => {
+          console.warn('[Apple artist search failed]', error);
+          return [];
+        })
+      : Promise.resolve([])
+  ]);
+
+  const artistMatch = artistResults
+    .map(item => {
+      const name = normalize(item.artistName);
+      let score = 0;
+      if (name === wantedArtist) score += 100;
+      else if (name && wantedArtist && (name.includes(wantedArtist) || wantedArtist.includes(name))) score += 50;
+      return { item, score };
+    })
+    .sort((a,b) => b.score-a.score)
+    .find(entry => entry.score >= 50)?.item || null;
+  const matchedArtistId = artistMatch?.artistId || null;
+
   const songMatch = songResults
     .map(item => {
       const title = normalize(item.trackName);
@@ -254,12 +281,14 @@ async function searchAppleCoverDirect(track){
       if (title === wantedTitle) score += 100;
       else if (title && wantedTitle && (title.includes(wantedTitle) || wantedTitle.includes(title))) score += 40;
       if (wantedArtist && (artist === wantedArtist || artist.includes(wantedArtist) || wantedArtist.includes(artist))) score += 50;
+      if (matchedArtistId && item.artistId === matchedArtistId) score += 25;
       return { item, score };
     })
     .sort((a,b) => b.score-a.score)
     .find(entry => entry.score >= 150)?.item || null;
 
-  // Second, resolve that exact collection ID to its album record/artwork.
+  // The song's collectionId is the authoritative album identity. This avoids
+  // confusing two releases that happen to share the same album title.
   let exactAlbum = null;
   if (songMatch?.collectionId) {
     try {
@@ -272,36 +301,33 @@ async function searchAppleCoverDirect(track){
     }
   }
 
-  // Third, text-search the album only as a fallback if the ID lookup failed.
-  let albumMatch = exactAlbum;
-  if (!albumMatch) {
-    const albumResults = await searchAppleCatalog(track, 'album').catch(error => {
-      console.warn('[Apple album search failed]', error);
-      return [];
-    });
-    albumMatch = albumResults
-      .map(item => {
-        const artist = normalize(item.artistName);
-        const album = normalize(item.collectionName || item.trackName);
-        let score = 0;
-        if (album === wantedAlbum) score += 100;
-        else if (album && wantedAlbum && (album.includes(wantedAlbum) || wantedAlbum.includes(album))) score += 45;
-        if (wantedArtist && (artist === wantedArtist || artist.includes(wantedArtist) || wantedArtist.includes(artist))) score += 50;
-        return { item, score };
-      })
-      .sort((a,b) => b.score-a.score)
-      .find(entry => entry.score >= 150)?.item || null;
-  }
+  // If the exact ID lookup is unavailable, use the album search, constrained
+  // by the artist identity when Apple returned a matching artist ID.
+  const albumMatch = exactAlbum || albumResults
+    .map(item => {
+      const artist = normalize(item.artistName);
+      const album = normalize(item.collectionName || item.trackName);
+      let score = 0;
+      if (album === wantedAlbum) score += 100;
+      else if (album && wantedAlbum && (album.includes(wantedAlbum) || wantedAlbum.includes(album))) score += 45;
+      if (wantedArtist && (artist === wantedArtist || artist.includes(wantedArtist) || wantedArtist.includes(artist))) score += 50;
+      if (matchedArtistId && item.artistId === matchedArtistId) score += 25;
+      return { item, score };
+    })
+    .sort((a,b) => b.score-a.score)
+    .find(entry => entry.score >= 150)?.item || null;
 
   const best = songMatch || albumMatch;
   if (!best) return null;
-  // Keep song metadata/track URL for attribution, but prefer the exact album art.
+  // Keep song metadata/track URL for attribution, but prefer album artwork.
   const artworkSource = albumMatch?.artworkUrl100 ? albumMatch : best;
   if (artworkSource?.artworkUrl100) {
     best.artworkUrlLarge = artworkSource.artworkUrl100.replace(/\d+x\d+(bb)?/i, '3000x3000bb');
   }
   best.albumArtworkSource = exactAlbum ? 'collection-id' : albumMatch ? 'album-search-fallback' : 'song-fallback';
   best.albumArtworkName = albumMatch?.collectionName || albumMatch?.trackName || null;
+  best.artistLookupName = artistMatch?.artistName || null;
+  best.artistLookupId = matchedArtistId;
   return best;
 }
 window.testAppleCover = searchAppleCoverDirect;
