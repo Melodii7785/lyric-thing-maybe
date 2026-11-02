@@ -185,7 +185,7 @@ function setDynamicBackgroundEnabled(enabled){
   if(enabled && ambientImageUrl) void setAmbientBackground(ambientImageUrl, true);
 }
 // Tiny Apple-cover experiment: Apple documents JSONP callbacks for cross-site Search API requests.
-function searchAppleCoverDirect(track){
+function searchAppleCatalog(track, entity){
   return new Promise((resolve, reject) => {
     const callback = '__appleCover_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const script = document.createElement('script');
@@ -200,17 +200,7 @@ function searchAppleCoverDirect(track){
     window[callback] = data => {
       clearTimeout(timeout);
       cleanup();
-      const results = Array.isArray(data?.results) ? data.results : [];
-      const wantedTitle = String(track.title || '').toLowerCase();
-      const wantedArtist = String((track.artists || [])[0] || '').toLowerCase();
-      const best = results.find(item =>
-        String(item.trackName || '').toLowerCase() === wantedTitle &&
-        String(item.artistName || '').toLowerCase().includes(wantedArtist)
-      ) || results[0] || null;
-      if (best?.artworkUrl100) {
-        best.artworkUrlLarge = best.artworkUrl100.replace(/\d+x\d+(bb)?/i, '3000x3000bb');
-      }
-      resolve(best);
+      resolve(Array.isArray(data?.results) ? data.results : []);
     };
     script.onerror = () => {
       clearTimeout(timeout);
@@ -221,13 +211,53 @@ function searchAppleCoverDirect(track){
       term: [track.title, (track.artists || [])[0], track.album].filter(Boolean).join(' '),
       country: 'BR',
       media: 'music',
-      entity: 'song',
-      limit: '5',
+      entity,
+      limit: '10',
       callback
     });
     script.src = 'https://itunes.apple.com/search?' + params;
     document.head.appendChild(script);
   });
+}
+async function searchAppleCoverDirect(track){
+  const normalize = value => String(value || '').toLowerCase().normalize('NFD')
+    .replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const wantedArtist = normalize((track.artists || [])[0]);
+  const wantedAlbum = normalize(track.album);
+  const wantedTitle = normalize(track.title);
+  const [albumResults, songResults] = await Promise.all([
+    searchAppleCatalog(track, 'album').catch(error => {
+      console.warn('[Apple album lookup failed]', error);
+      return [];
+    }),
+    searchAppleCatalog(track, 'song')
+  ]);
+  const albumMatch = albumResults
+    .map(item => {
+      const artist = normalize(item.artistName);
+      const album = normalize(item.collectionName || item.trackName);
+      let score = 0;
+      if (album === wantedAlbum) score += 100;
+      else if (album && wantedAlbum && (album.includes(wantedAlbum) || wantedAlbum.includes(album))) score += 45;
+      if (wantedArtist && (artist === wantedArtist || artist.includes(wantedArtist) || wantedArtist.includes(artist))) score += 50;
+      return { item, score };
+    })
+    .sort((a,b) => b.score-a.score)
+    .find(entry => entry.score >= 145)?.item || null;
+  const songMatch = songResults.find(item =>
+    normalize(item.trackName) === wantedTitle &&
+    (!wantedArtist || normalize(item.artistName).includes(wantedArtist))
+  ) || songResults[0] || null;
+  const best = songMatch || albumMatch;
+  if (!best) return null;
+  // Keep the song URL for attribution, but prefer the actual album's artwork.
+  const artworkSource = albumMatch?.artworkUrl100 ? albumMatch : best;
+  if (artworkSource?.artworkUrl100) {
+    best.artworkUrlLarge = artworkSource.artworkUrl100.replace(/\\d+x\\d+(bb)?/i, '3000x3000bb');
+  }
+  best.albumArtworkSource = albumMatch ? 'album' : 'song-fallback';
+  best.albumArtworkName = albumMatch?.collectionName || null;
+  return best;
 }
 window.testAppleCover = searchAppleCoverDirect;
 function say(message){ $('status').textContent = message; }
