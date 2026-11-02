@@ -225,38 +225,66 @@ async function searchAppleCoverDirect(track){
   const wantedArtist = normalize((track.artists || [])[0]);
   const wantedAlbum = normalize(track.album);
   const wantedTitle = normalize(track.title);
-  const [albumResults, songResults] = await Promise.all([
-    searchAppleCatalog(track, 'album').catch(error => {
-      console.warn('[Apple album lookup failed]', error);
-      return [];
-    }),
-    searchAppleCatalog(track, 'song')
-  ]);
-  const albumMatch = albumResults
+
+  // First find the exact song. Its collectionId identifies the actual release,
+  // even when the artist has multiple albums with the same title.
+  const songResults = await searchAppleCatalog(track, 'song');
+  const songMatch = songResults
     .map(item => {
+      const title = normalize(item.trackName);
       const artist = normalize(item.artistName);
-      const album = normalize(item.collectionName || item.trackName);
       let score = 0;
-      if (album === wantedAlbum) score += 100;
-      else if (album && wantedAlbum && (album.includes(wantedAlbum) || wantedAlbum.includes(album))) score += 45;
+      if (title === wantedTitle) score += 100;
+      else if (title && wantedTitle && (title.includes(wantedTitle) || wantedTitle.includes(title))) score += 40;
       if (wantedArtist && (artist === wantedArtist || artist.includes(wantedArtist) || wantedArtist.includes(artist))) score += 50;
       return { item, score };
     })
     .sort((a,b) => b.score-a.score)
-    .find(entry => entry.score >= 145)?.item || null;
-  const songMatch = songResults.find(item =>
-    normalize(item.trackName) === wantedTitle &&
-    (!wantedArtist || normalize(item.artistName).includes(wantedArtist))
-  ) || songResults[0] || null;
+    .find(entry => entry.score >= 150)?.item || null;
+
+  // Second, resolve that exact collection ID to its album record/artwork.
+  let exactAlbum = null;
+  if (songMatch?.collectionId) {
+    try {
+      const lookupResults = await lookupAppleId(songMatch.collectionId);
+      exactAlbum = lookupResults.find(item =>
+        item.wrapperType === 'collection' || item.collectionId
+      ) || lookupResults[0] || null;
+    } catch(error) {
+      console.warn('[Apple collection ID lookup failed]', error);
+    }
+  }
+
+  // Third, text-search the album only as a fallback if the ID lookup failed.
+  let albumMatch = exactAlbum;
+  if (!albumMatch) {
+    const albumResults = await searchAppleCatalog(track, 'album').catch(error => {
+      console.warn('[Apple album search failed]', error);
+      return [];
+    });
+    albumMatch = albumResults
+      .map(item => {
+        const artist = normalize(item.artistName);
+        const album = normalize(item.collectionName || item.trackName);
+        let score = 0;
+        if (album === wantedAlbum) score += 100;
+        else if (album && wantedAlbum && (album.includes(wantedAlbum) || wantedAlbum.includes(album))) score += 45;
+        if (wantedArtist && (artist === wantedArtist || artist.includes(wantedArtist) || wantedArtist.includes(artist))) score += 50;
+        return { item, score };
+      })
+      .sort((a,b) => b.score-a.score)
+      .find(entry => entry.score >= 150)?.item || null;
+  }
+
   const best = songMatch || albumMatch;
   if (!best) return null;
-  // Keep the song URL for attribution, but prefer the actual album's artwork.
+  // Keep song metadata/track URL for attribution, but prefer the exact album art.
   const artworkSource = albumMatch?.artworkUrl100 ? albumMatch : best;
   if (artworkSource?.artworkUrl100) {
     best.artworkUrlLarge = artworkSource.artworkUrl100.replace(/\\d+x\\d+(bb)?/i, '3000x3000bb');
   }
-  best.albumArtworkSource = albumMatch ? 'album' : 'song-fallback';
-  best.albumArtworkName = albumMatch?.collectionName || null;
+  best.albumArtworkSource = exactAlbum ? 'collection-id' : albumMatch ? 'album-search-fallback' : 'song-fallback';
+  best.albumArtworkName = albumMatch?.collectionName || albumMatch?.trackName || null;
   return best;
 }
 window.testAppleCover = searchAppleCoverDirect;
