@@ -219,9 +219,26 @@ function searchAppleCatalog(track, entity){
     document.head.appendChild(script);
   });
 }
+function lookupAppleId(collectionId){
+  return new Promise((resolve, reject) => {
+    if(!/^\d+$/.test(String(collectionId))) return reject(new Error('invalid_collection_id'));
+    const callback = '__appleLookup_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const cleanup = () => { script.remove(); try { delete window[callback]; } catch {} };
+    const timeout = setTimeout(() => { cleanup(); reject(new Error('apple_lookup_timeout')); }, 10000);
+    window[callback] = data => {
+      clearTimeout(timeout); cleanup();
+      resolve(Array.isArray(data?.results) ? data.results : []);
+    };
+    script.onerror = () => { clearTimeout(timeout); cleanup(); reject(new Error('apple_lookup_load_failed')); };
+    const params = new URLSearchParams({ id: String(collectionId), country: 'BR', callback });
+    script.src = 'https://itunes.apple.com/lookup?' + params;
+    document.head.appendChild(script);
+  });
+}
 async function searchAppleCoverDirect(track){
   const normalize = value => String(value || '').toLowerCase().normalize('NFD')
-    .replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
   const wantedArtist = normalize((track.artists || [])[0]);
   const wantedAlbum = normalize(track.album);
   const wantedTitle = normalize(track.title);
@@ -281,7 +298,7 @@ async function searchAppleCoverDirect(track){
   // Keep song metadata/track URL for attribution, but prefer the exact album art.
   const artworkSource = albumMatch?.artworkUrl100 ? albumMatch : best;
   if (artworkSource?.artworkUrl100) {
-    best.artworkUrlLarge = artworkSource.artworkUrl100.replace(/\\d+x\\d+(bb)?/i, '3000x3000bb');
+    best.artworkUrlLarge = artworkSource.artworkUrl100.replace(/\d+x\d+(bb)?/i, '3000x3000bb');
   }
   best.albumArtworkSource = exactAlbum ? 'collection-id' : albumMatch ? 'album-search-fallback' : 'song-fallback';
   best.albumArtworkName = albumMatch?.collectionName || albumMatch?.trackName || null;
