@@ -598,7 +598,8 @@ function loadIntoAMLL(){
       romanLyric:'',
       startTime,
       endTime:Math.max(inferredEnd,Number.isFinite(nextLineTime)?Math.round(nextLineTime*1000):0),
-      isBG:line.isBG===true,\n      isDuet:line.isDuet===true
+      isBG:line.isBG===true,
+      isDuet:line.isDuet===true
     };
   });
   const currentTime=Math.round(currentPlaybackSeconds()*1000);
