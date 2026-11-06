@@ -453,7 +453,7 @@ function renderSpicyLyrics(data){
 function timeSeconds(value){
   if(!value) return null;
   const input=value.trim();
-  if(/^\\d+(?:\\.\\d+)?s$/.test(input)) return Number(input.slice(0,-1));
+  if(/^\d+(?:\.\d+)?s$/.test(input)) return Number(input.slice(0,-1));
   const parts=input.split(':');
   if(parts.length===3) return Number(parts[0])*3600+Number(parts[1])*60+Number(parts[2]);
   if(parts.length===2) return Number(parts[0])*60+Number(parts[1]);
@@ -598,8 +598,7 @@ function loadIntoAMLL(){
       romanLyric:'',
       startTime,
       endTime:Math.max(inferredEnd,Number.isFinite(nextLineTime)?Math.round(nextLineTime*1000):0),
-      isBG:false,
-      isDuet:false
+      isBG:line.isBG===true,\n      isDuet:line.isDuet===true
     };
   });
   const currentTime=Math.round(currentPlaybackSeconds()*1000);
