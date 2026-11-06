@@ -425,7 +425,10 @@ function renderSpicyLyrics(data){
   lyricLines=content.flatMap(entry=>{
     const lead=spicyVocalWords(entry?.Lead,entry?.StartTime??body.StartTime??0);
     const lines=[];
-    if(lead.text.trim()) lines.push({...lead,isBG:false,isDuet:false});
+    // Spicy Lyrics marks opposite-side duet vocals explicitly. AMLL's
+    // isDuet flag applies the opposite/right-side lyric alignment.
+    const oppositeAligned=entry?.OppositeAligned===true;
+    if(lead.text.trim()) lines.push({...lead,isBG:false,isDuet:oppositeAligned});
     // Spicy Lyrics exposes backing vocals as a separate Background[] array.
     // Keep each backing part as its own AMLL line instead of flattening it
     // into the lead vocal (which loses the background-vocal styling).
