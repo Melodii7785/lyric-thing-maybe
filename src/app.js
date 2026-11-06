@@ -403,26 +403,39 @@ function setAttribution(source, uploadAttribution){
     addCredit('made by',uploadAttribution.Maker);
   }
 }
+function spicyVocalWords(vocal, fallbackTime=0){
+  const syllables=Array.isArray(vocal?.Syllables)?vocal.Syllables.map(s=>({
+    text:typeof s.Text==='string'?s.Text:'',
+    time:Number.isFinite(s.StartTime)?s.StartTime:null,
+    endTime:Number.isFinite(s.EndTime)?s.EndTime:null,
+    isPartOfWord:s.IsPartOfWord===true
+  })).filter(s=>s.text):[];
+  const text=syllables.length
+    ? syllables.map((s,i)=>s.text+(!s.isPartOfWord&&i<syllables.length-1?' ':'')).join('')
+    : (vocal?.Text||vocal?.TransliteratedText||vocal?.TranslatedText||'');
+  const candidateTimes=[vocal?.StartTime,syllables[0]?.time,fallbackTime];
+  const time=candidateTimes.find(t=>typeof t==='number'&&Number.isFinite(t));
+  return {time:time??0,text,words:syllables};
+}
 function renderSpicyLyrics(data){
   clearLyrics();
   $('lyrics-panel').hidden=false;
   const body=data.spicyLyrics||{};
   const content=Array.isArray(body.Content)?body.Content:[];
-  lyricLines=content.map(entry=>{
-    const lead=entry?.Lead||{};
-    const syllables=Array.isArray(lead.Syllables)?lead.Syllables.map(s=>({
-      text:typeof s.Text==='string'?s.Text:'',
-      time:Number.isFinite(s.StartTime)?s.StartTime:null,
-      endTime:Number.isFinite(s.EndTime)?s.EndTime:null,
-      isPartOfWord:s.IsPartOfWord===true
-    })).filter(s=>s.text):[];
-    const text=syllables.length
-      ? syllables.map((s,i)=>s.text+(!s.isPartOfWord&&i<syllables.length-1?' ':'')).join('')
-      : (lead.Text||lead.TransliteratedText||lead.TranslatedText||entry?.Text||'');
-    const candidateTimes=[lead.StartTime,entry?.StartTime,syllables[0]?.time,body.StartTime];
-    const time=candidateTimes.find(t=>typeof t==='number'&&Number.isFinite(t));
-    return {time:time??0,text,words:syllables};
-  }).filter(line=>line.text.trim());
+  lyricLines=content.flatMap(entry=>{
+    const lead=spicyVocalWords(entry?.Lead,entry?.StartTime??body.StartTime??0);
+    const lines=[];
+    if(lead.text.trim()) lines.push({...lead,isBG:false,isDuet:false});
+    // Spicy Lyrics exposes backing vocals as a separate Background[] array.
+    // Keep each backing part as its own AMLL line instead of flattening it
+    // into the lead vocal (which loses the background-vocal styling).
+    const backgrounds=Array.isArray(entry?.Background)?entry.Background:[];
+    for(const vocal of backgrounds){
+      const background=spicyVocalWords(vocal,entry?.StartTime??lead.time);
+      if(background.text.trim()) lines.push({...background,isBG:true,isDuet:false});
+    }
+    return lines;
+  }).sort((a,b)=>a.time-b.time);
   setAttribution(body.source,body.UploadAttribution);
   if(!lyricLines.length){
     $('lyrics-meta').textContent='Spicy Lyrics returned a response, but it contained no renderable lyric lines.';
@@ -439,7 +452,9 @@ function renderSpicyLyrics(data){
 }
 function timeSeconds(value){
   if(!value) return null;
-  const parts=value.trim().split(':');
+  const input=value.trim();
+  if(/^\\d+(?:\\.\\d+)?s$/.test(input)) return Number(input.slice(0,-1));
+  const parts=input.split(':');
   if(parts.length===3) return Number(parts[0])*3600+Number(parts[1])*60+Number(parts[2]);
   if(parts.length===2) return Number(parts[0])*60+Number(parts[1]);
   return null;
@@ -447,16 +462,91 @@ function timeSeconds(value){
 function parseTtml(value){
   const xml=new DOMParser().parseFromString(value,'application/xml');
   if(xml.querySelector('parsererror')) throw new Error('invalid_ttml');
-  return Array.from(xml.getElementsByTagNameNS('*','p')).map(p=>{
-    const time=timeSeconds(p.getAttribute('begin'));
-    const spans=Array.from(p.getElementsByTagNameNS('*','span')).map(span=>({
-      text:span.textContent||'',
-      time:timeSeconds(span.getAttribute('begin')),
-      end:timeSeconds(span.getAttribute('end'))
-    })).filter(word=>word.text);
-    const text=spans.length ? spans.map(word=>word.text).join('') : (p.textContent||'').trim();
-    return {time:time??0,text,words:spans};
-  }).filter(line=>line.text.trim()).sort((a,b)=>a.time-b.time);
+  const ttmNamespace='http://www.w3.org/ns/ttml#metadata';
+  const xmlNamespace='http://www.w3.org/XML/1998/namespace';
+  const agentIds=Array.from(xml.getElementsByTagNameNS(ttmNamespace,'agent'))
+    .map(agent=>agent.getAttributeNS(xmlNamespace,'id')||agent.getAttribute('xml:id'))
+    .filter(Boolean);
+  const distinctAgents=[...new Set(Array.from(xml.getElementsByTagNameNS('*','p'))
+    .map(p=>p.getAttributeNS(ttmNamespace,'agent')||p.getAttribute('ttm:agent'))
+    .filter(Boolean))];
+  const hasMultipleSingers=distinctAgents.length>1;
+  const firstAgent=distinctAgents[0]||agentIds[0]||null;
+  const getRole=element=>element.getAttributeNS(ttmNamespace,'role')||element.getAttribute('ttm:role')||'';
+  const parseWords=nodes=>{
+    const words=[];
+    for(const node of nodes){
+      if(node.nodeType===Node.TEXT_NODE){
+        if(node.textContent) words.push({text:node.textContent,time:null,endTime:null});
+        continue;
+      }
+      if(node.nodeType!==Node.ELEMENT_NODE) continue;
+      const element=node;
+      if(getRole(element)) continue;
+      if(element.localName==='span'){
+        const nested=Array.from(element.childNodes).filter(child=>
+          !(child.nodeType===Node.ELEMENT_NODE && getRole(child)==='x-bg'));
+        if(nested.some(child=>child.nodeType===Node.ELEMENT_NODE)){
+          words.push(...parseWords(nested));
+        }else{
+          const text=element.textContent||'';
+          if(text) words.push({text,time:timeSeconds(element.getAttribute('begin')),endTime:timeSeconds(element.getAttribute('end'))});
+        }
+      }else{
+        words.push(...parseWords(Array.from(element.childNodes)));
+      }
+    }
+    return words.filter(word=>word.text);
+  };
+  const parseBackgroundWords=element=>{
+    const words=[];
+    const visit=node=>{
+      for(const child of Array.from(node.childNodes||[])){
+        if(child.nodeType===Node.TEXT_NODE){
+          if(child.textContent) words.push({text:child.textContent,time:null,endTime:null});
+        }else if(child.nodeType===Node.ELEMENT_NODE){
+          const role=getRole(child);
+          if(role==='x-translation'||role==='x-roman') continue;
+          if(child.localName==='span'){
+            const nested=Array.from(child.childNodes).some(n=>n.nodeType===Node.ELEMENT_NODE);
+            if(nested) visit(child);
+            else if(child.textContent) words.push({text:child.textContent,time:timeSeconds(child.getAttribute('begin')),endTime:timeSeconds(child.getAttribute('end'))});
+          }else visit(child);
+        }
+      }
+    };
+    visit(element);
+    return words.filter(word=>word.text);
+  };
+  const parsed=[];
+  for(const p of Array.from(xml.getElementsByTagNameNS('*','p'))){
+    const lineTime=timeSeconds(p.getAttribute('begin'))??0;
+    const agent=p.getAttributeNS(ttmNamespace,'agent')||p.getAttribute('ttm:agent')||null;
+    const isDuet=hasMultipleSingers && !!agent && agent!==firstAgent;
+    const directChildren=Array.from(p.childNodes);
+    const mainWords=parseWords(directChildren);
+    const mainText=mainWords.map(word=>word.text).join('').trim();
+    if(mainText){
+      parsed.push({time:lineTime,text:mainText,words:mainWords,isBG:false,isDuet});
+    }
+    const backgrounds=[];
+    const collectBackgrounds=node=>{
+      for(const child of Array.from(node.childNodes||[])){
+        if(child.nodeType!==Node.ELEMENT_NODE) continue;
+        if(getRole(child)==='x-bg') backgrounds.push(child);
+        else collectBackgrounds(child);
+      }
+    };
+    collectBackgrounds(p);
+    for(const background of backgrounds){
+      const words=parseBackgroundWords(background);
+      const text=words.map(word=>word.text).join('').trim();
+      if(!text) continue;
+      const bgTime=timeSeconds(background.getAttribute('begin'))??words.find(word=>word.time!==null)?.time??lineTime;
+      parsed.push({time:bgTime,text,words,isBG:true,isDuet:false});
+    }
+  }
+  return parsed.sort((a,b)=>a.time-b.time);
 }
 function renderLyrics(data){
   clearLyrics();
