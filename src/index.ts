@@ -508,7 +508,23 @@ async function handle(request: Request, env: Env): Promise<Response> {
         if (spicyResponse.ok) {
           const spicyPayload = await spicyResponse.json() as any;
           const body = spicyPayload?.Body;
-          if (body && Array.isArray(body.Content) && body.Content.length) {
+          // A non-empty Content array is not enough: some responses contain
+          // instrumental/empty vocal entries. Only select Spicy when at least
+          // one actual lyric string can be rendered; otherwise keep looking
+          // through the normal lrc.red fallback below.
+          const hasRenderableVocal = (vocal: any): boolean => {
+            if (!vocal || typeof vocal !== "object") return false;
+            if ([vocal.Text, vocal.TransliteratedText, vocal.TranslatedText]
+              .some(value => typeof value === "string" && value.trim().length > 0)) return true;
+            return Array.isArray(vocal.Syllables) && vocal.Syllables.some((syllable: any) =>
+              typeof syllable?.Text === "string" && syllable.Text.trim().length > 0
+            );
+          };
+          const hasRenderableLines = Array.isArray(body?.Content) && body.Content.some((entry: any) =>
+            hasRenderableVocal(entry?.Lead) ||
+            (Array.isArray(entry?.Background) && entry.Background.some(hasRenderableVocal))
+          );
+          if (body && hasRenderableLines) {
             return json({ track: trackInfo, spicyLyrics: body });
           }
         }
