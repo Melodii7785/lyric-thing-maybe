@@ -32,6 +32,23 @@ const TOKEN_URL = "https://accounts.spotify.com/api/token";
 const API_URL = "https://api.spotify.com/v1";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 
+function spotifyUpstreamDiagnostics(endpoint: string, response: Response) {
+  const diagnostics = {
+    endpoint,
+    status: response.status,
+    requestId: response.headers.get("x-spotify-request-id") || response.headers.get("x-request-id") || null,
+    retryAfter: response.headers.get("retry-after") || null,
+    contentType: response.headers.get("content-type") || null,
+  };
+  // Deliberately omit response bodies, authorization headers, tokens, and user data.
+  console.warn("Spotify Web API request failed", diagnostics);
+  return {
+    upstreamStatus: diagnostics.status,
+    upstreamRequestId: diagnostics.requestId,
+    retryAfter: diagnostics.retryAfter,
+  };
+}
+
 function json(data: unknown, status = 200, extra: HeadersInit = {}): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -186,7 +203,10 @@ async function handle(request: Request, env: Env): Promise<Response> {
       headers: { authorization: "Bearer " + await decrypt(env, session.access_token_enc), accept: "application/json" },
     });
     if (response.status === 401) return json({ error: "spotify_reconnect_required" }, 401);
-    if (!response.ok) return json({ error: response.status === 403 ? "spotify_access_denied" : "spotify_devices_failed" }, response.status === 403 ? 403 : 502);
+    if (!response.ok) return json({
+      error: response.status === 403 ? "spotify_access_denied" : "spotify_devices_failed",
+      ...spotifyUpstreamDiagnostics("/me/player/devices", response),
+    }, response.status === 403 ? 403 : 502);
     const data = await response.json() as any;
     return json({ devices: Array.isArray(data.devices) ? data.devices.map((device: any) => ({
       id: device.id ?? null, name: device.name ?? "Spotify device", type: device.type ?? "unknown",
@@ -252,7 +272,10 @@ async function handle(request: Request, env: Env): Promise<Response> {
     }
     if (response.status === 404) return json({ error: "spotify_no_active_device" }, 404);
     if (response.status === 429) return json({ error: "spotify_rate_limited" }, 429);
-    if (!response.ok) return json({ error: "spotify_command_failed", status: response.status }, 502);
+    if (!response.ok) return json({
+      error: "spotify_command_failed",
+      ...spotifyUpstreamDiagnostics(command.endpoint, response),
+    }, 502);
     return json({ ok: true });
   }
   if (path === "/api/spotify/playback" && request.method === "GET") {
@@ -267,7 +290,10 @@ async function handle(request: Request, env: Env): Promise<Response> {
     if (response.status === 204 || response.status === 202) return json({ playing: false, track: null });
     if (response.status === 401) return json({ error: "spotify_reconnect_required" }, 401);
     if (response.status === 403) return json({ error: "spotify_access_denied" }, 403);
-    if (!response.ok) return json({ error: "spotify_request_failed", status: response.status }, 502);
+    if (!response.ok) return json({
+      error: "spotify_request_failed",
+      ...spotifyUpstreamDiagnostics("/me/player/currently-playing", response),
+    }, 502);
     const data = await response.json() as any;
     if (!data?.item) return json({ playing: false, track: null });
     const track = data.item;
