@@ -379,6 +379,17 @@ function setAttribution(source, uploadAttribution){
   providerLink.target='_blank'; providerLink.rel='noreferrer'; providerLink.style.color='#f49ac2'; providerLink.textContent=provider;
   target.append(providerLink);
 
+  // lrc.red lyrics also get a direct link to the matching Apple Music track.
+  if(source==='lrc.red' && currentAppleTrack?.trackViewUrl){
+    target.append(' · ');
+    const appleLink=document.createElement('a');
+    appleLink.href=currentAppleTrack.trackViewUrl;
+    appleLink.target='_blank'; appleLink.rel='noreferrer';
+    appleLink.style.color='#f49ac2';
+    appleLink.textContent='View on Apple Music';
+    target.append(appleLink);
+  }
+
   // Community lyrics can still point people to the matched Apple Music track.
   if(source==='spicy_lyrics' && currentAppleTrack?.trackViewUrl){
     target.append(' · ');
