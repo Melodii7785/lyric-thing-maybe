@@ -119,6 +119,7 @@ async function loadNowbarMotion(fallbackImageUrl=''){
     nowbarMotionHls=null;
   }
   video.pause();
+  video.crossOrigin='anonymous';
   video.onloadeddata=null;
   video.onerror=null;
   video.removeAttribute('src');
@@ -143,6 +144,7 @@ async function loadNowbarMotion(fallbackImageUrl=''){
           nowbarMotionHls=null;
           video.style.display='none';
           $('nowbar-cover').style.display='block';
+          void restoreStaticBackground();
         }
       });
       nowbarMotionHls.loadSource(motion.square);
@@ -152,7 +154,6 @@ async function loadNowbarMotion(fallbackImageUrl=''){
     }else throw new Error('HLS not supported');
 
     video.muted=true; video.loop=true; video.playsInline=true;
-    video.crossOrigin='anonymous';
     // Keep the normal cover visible until we have an actual video frame.
     video.onloadeddata=async()=>{
       if(trackAtStart!==currentTrackId) return;
