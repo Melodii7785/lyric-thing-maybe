@@ -98,8 +98,19 @@ async function setAmbientBackground(imageUrl, force = false){
     console.warn('[Kawarp background failed]', error);
   }
 }
-async function loadNowbarMotion(){
+async function loadNowbarMotion(fallbackImageUrl=''){
   const video=$('nowbar-motion');
+  const trackAtStart=currentTrackId;
+  const restoreStaticBackground=async()=>{
+    if(trackAtStart!==currentTrackId) return;
+    try{
+      const renderer=await getKawarp();
+      if(trackAtStart!==currentTrackId || !dynamicBackgroundEnabled) return;
+      if(fallbackImageUrl) await renderer.loadImage(fallbackImageUrl);
+    }catch(error){
+      console.warn('[Kawarp motion fallback failed]',error);
+    }
+  };
 
   // A new song starts with a clean slate. Otherwise the previous HLS stream
   // happily keeps playing when the new song has no Album Motion. Rude.
@@ -108,10 +119,13 @@ async function loadNowbarMotion(){
     nowbarMotionHls=null;
   }
   video.pause();
+  video.onloadeddata=null;
+  video.onerror=null;
   video.removeAttribute('src');
   video.load();
   video.style.display='none';
   $('nowbar-cover').style.display='block';
+  void restoreStaticBackground();
 
   try{
     const response=await fetch('/api/apple-motion',{credentials:'same-origin'});
@@ -138,21 +152,45 @@ async function loadNowbarMotion(){
     }else throw new Error('HLS not supported');
 
     video.muted=true; video.loop=true; video.playsInline=true;
+    video.crossOrigin='anonymous';
     // Keep the normal cover visible until we have an actual video frame.
-    video.onloadeddata=()=>{
+    video.onloadeddata=async()=>{
+      if(trackAtStart!==currentTrackId) return;
       video.style.display='block';
       $('nowbar-cover').style.display='none';
+      try{
+        if(!('requestVideoFrameCallback' in HTMLVideoElement.prototype)){
+          throw new Error('requestVideoFrameCallback is not supported in this browser');
+        }
+        if(dynamicBackgroundEnabled){
+          const renderer=await getKawarp();
+          if(trackAtStart!==currentTrackId) return;
+          renderer.loadVideo(video,{
+            frameRate:12,
+            smoothing:120,
+            onError:error=>{
+              console.warn('[Kawarp could not sample Album Motion]',error);
+              void restoreStaticBackground();
+            }
+          });
+        }
+      }catch(error){
+        console.warn('[Kawarp Album Motion sync unavailable]',error);
+        void restoreStaticBackground();
+      }
       video.play().catch(()=>{});
     };
     video.onerror=()=>{
       video.style.display='none';
       $('nowbar-cover').style.display='block';
+      void restoreStaticBackground();
     };
   }catch{
     // No Album Motion for this song: the static cover we restored above stays.
     video.pause();
     video.style.display='none';
     $('nowbar-cover').style.display='block';
+    void restoreStaticBackground();
   }
 }
 
@@ -762,7 +800,7 @@ async function playback(){
         void nowbarCover.offsetWidth;
         nowbarCover.src=data.track.image;
         nowbarCover.classList.add('art-changing');
-        loadNowbarMotion();
+        loadNowbarMotion(data.track.image || '');
       }
     } else $('cover').style.display='none';
     latestProgressMs=Number(data.progressMs||0);
