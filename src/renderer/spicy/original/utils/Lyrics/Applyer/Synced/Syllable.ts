@@ -14,8 +14,8 @@ import {
 } from "../../../Scrolling/Simplebar/ScrollSimplebar.ts";
 import { IdleEmphasisLyricsScale, IdleLyricsScale } from "../../Animator/Shared.ts";
 import { ConvertTime } from "../../ConvertTime.ts";
-import { ClearLyricsPageContainer } from "../../fetchLyrics.ts";
-import isRtl from "../../isRtl.ts";
+import { ClearLyricsPageContainer } from "../../../fetchLyrics.ts";
+import isRtl from "../../../isRtl.ts";
 import {
   ClearLyricsContentArrays,
   CurrentLineLyricsObject,
