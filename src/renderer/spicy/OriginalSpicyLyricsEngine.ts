@@ -41,7 +41,7 @@ export class OriginalSpicyLyricsEngine {
   }
 
   setPosition(milliseconds: number) {
-    SpotifyPlayer.SetPosition(milliseconds);
+    SpotifyPlayer.setPosition(milliseconds);
     Lyrics.TimeSetter(milliseconds);
     if (this.playing) Lyrics.Animate(milliseconds);
   }
