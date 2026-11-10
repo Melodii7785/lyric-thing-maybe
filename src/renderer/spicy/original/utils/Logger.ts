@@ -1,0 +1,1 @@
+export default class Logger { constructor(private name: string) {} log(...args: unknown[]) { console.log("[", this.name, "]", ...args); } warn(...args: unknown[]) { console.warn("[", this.name, "]", ...args); } error(...args: unknown[]) { console.error("[", this.name, "]", ...args); } }
