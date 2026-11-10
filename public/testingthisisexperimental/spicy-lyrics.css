@@ -32,8 +32,18 @@
 #lyrics .line.NotSung { opacity: .55; --gradient-position: -20%; }
 #lyrics .line .word, #lyrics .line .letter, #lyrics .line .letterGroup {
   display: inline-block; white-space: pre-wrap;
-  background-image: inherit; background-clip: text; -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+}
+#lyrics .line .word, #lyrics .line .letter {
+  background-image: linear-gradient(180deg, rgba(255,255,255,.9) var(--gradient-position, -20%),
+    rgba(255,255,255,.42) calc(var(--gradient-position, -20%) + 20%));
+  background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+#lyrics .line.Active .word, #lyrics .line.Active .letter {
+  background-image: linear-gradient(180deg, var(--accent-hot, #ff0436) var(--gradient-position, -20%),
+    rgba(255,255,255,.62) calc(var(--gradient-position, -20%) + 20%));
+}
+#lyrics .line.static .word {
+  background: none; -webkit-text-fill-color: currentColor; color: rgba(255,255,255,.86);
 }
 #lyrics .word-group { display: inline-block; white-space: nowrap; }
 #lyrics .line .word:not(.PartOfWord, .dot, .LastWordInLine)::after,
