@@ -1,1 +1,4 @@
-export const isExperimentEnabled = (_name: string): boolean => false;
+import { $experiment } from "./stores.ts";
+export { $experiment };
+export const isExperimentEnabled = (name: string): boolean =>
+  $experiment.get()[name] === true;
