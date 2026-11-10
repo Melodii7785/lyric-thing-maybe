@@ -20,7 +20,8 @@ export interface SpicyLine {
   isDuet?: boolean;
 }
 
-type RenderWord = { element: HTMLElement; start: number; end: number; spring: Spring };
+type RenderLetter = { element: HTMLElement; start: number; end: number; spring: Spring };
+type RenderWord = { element: HTMLElement; letters: RenderLetter[] };
 
 export class SpicyLyricsRenderer {
   private root = document.createElement("div");
@@ -54,14 +55,21 @@ export class SpicyLyricsRenderer {
         const span = document.createElement("span");
         span.className = "word";
         const parts = SplitLetters(word.word);
-        for (const part of parts) {
+        const start = word.startTime;
+        const end = Math.max(start + 1, word.endTime);
+        const duration = (end - start) / Math.max(1, parts.length);
+        const letters: RenderLetter[] = [];
+        for (let index = 0; index < parts.length; index++) {
           const letter = document.createElement("span");
           letter.className = "letter";
-          letter.textContent = part;
+          letter.textContent = parts[index];
           span.appendChild(letter);
+          const letterStart = start + duration * index;
+          const letterEnd = letterStart + duration;
+          letters.push({ element: letter, start: letterStart, end: Math.max(letterStart + 1, letterEnd), spring: new Spring(0, 3.2, 0.82) });
         }
         row.appendChild(span);
-        this.words.push({ element: span, start: word.startTime, end: Math.max(word.startTime + 1, word.endTime), spring: new Spring(0, 3.2, 0.82) });
+        this.words.push({ element: span, letters });
       }
       fragment.appendChild(row);
     }
@@ -89,8 +97,10 @@ export class SpicyLyricsRenderer {
       if (isActive) active = row;
     }
     for (const word of this.words) {
-      const progress = Math.max(0, Math.min(1, (this.currentTime - word.start) / (word.end - word.start)));
-      word.spring.SetGoal(progress);
+      for (const letter of word.letters) {
+        const progress = Math.max(0, Math.min(1, (this.currentTime - letter.start) / (letter.end - letter.start)));
+        letter.spring.SetGoal(progress);
+      }
     }
     if (active && active !== this.activeRow) {
       this.activeRow = active;
@@ -108,9 +118,11 @@ export class SpicyLyricsRenderer {
     const dt = this.lastFrame ? Math.min((now - this.lastFrame) / 1000, 0.05) : 0;
     this.lastFrame = now;
     for (const word of this.words) {
-      const value = word.spring.Step(dt);
-      const pct = Math.max(0, Math.min(1, value)) * 100;
-      word.element.style.setProperty("--spicy-fill", pct + "%");
+      for (const letter of word.letters) {
+        const value = letter.spring.Step(dt);
+        const pct = Math.max(0, Math.min(1, value)) * 100;
+        letter.element.style.setProperty("--spicy-fill", pct + "%");
+      }
     }
     this.updateActiveLine();
     this.raf = requestAnimationFrame(this.frame);
