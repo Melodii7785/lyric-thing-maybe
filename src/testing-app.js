@@ -1,8 +1,12 @@
 import '@fontsource-variable/inter';
 import Hls from 'hls.js';
 // Keep the verified app.js fix on a fresh commit so CI can run again.
-import { LyricPlayer } from '@applemusic-like-lyrics/core';
-import '@applemusic-like-lyrics/core/style.css';
+import {
+  applyLineLyrics, applySyllableLyrics, applyStaticLyrics, clearLyricsArrays
+} from './renderer/spicy/lyrics-applyer.js';
+import { setLyricsTime } from './renderer/spicy/lyrics-setter.js';
+import { animateLyrics, resetAnimator } from './renderer/spicy/lyrics-animator.js';
+import { initScrollManager, scrollToActiveLine, resetScrollManager } from './renderer/spicy/scroll-manager.js';
 
 const $ = id => document.getElementById(id);
 let poller = null;
@@ -11,16 +15,9 @@ let currentAppleTrack = null;
 let lyricRequestId = 0;
 let lyricLines = [];
 let lyricsAreSynced = false;
-let amllPlayer = new LyricPlayer();
-let lastFrameTime = null;
+let rendererMode = 'Static';
+let scrollManagerInitialized = false;
 const lyricHost = $('lyrics');
-lyricHost.appendChild(amllPlayer.getElement());
-amllPlayer.setOptimizeOptions({
-  normalizeSpaces: false,
-  resetLineTimestamps: false,
-  cleanUnintentionalOverlaps: false,
-  tryAdvanceStartTime: false
-});
 let latestProgressMs = 0;
 let progressObservedAt = Date.now();
 let isPlaying = false;
@@ -391,11 +388,11 @@ async function api(path, options={}) {
 function clearTrack(){ $('track').hidden=true; $('nowbar').hidden=true; $('cover').style.display='none'; }
 function clearLyrics(){
   lyricLines=[];
-  if(amllPlayer){
-    amllPlayer.setLyricLines([]);
-    amllPlayer.setCurrentTime(0, true);
-    amllPlayer.pause();
-  }
+  clearLyricsArrays();
+  resetAnimator();
+  resetScrollManager();
+  lyricHost.replaceChildren();
+  lyricHost.scrollTop=0;
   $('lyrics-panel').hidden=true;
   $('lyrics-attribution').replaceChildren();
 }
@@ -492,7 +489,6 @@ function renderSpicyLyrics(data){
   setAttribution(body.source,body.UploadAttribution);
   if(!lyricLines.length){
     $('lyrics-meta').textContent='Spicy Lyrics returned a response, but it contained no renderable lyric lines.';
-    amllPlayer.setLyricLines([]);
     return;
   }
   const hasSyllableTiming=lyricLines.some(line=>line.words.some(word=>word.time!==null&&word.endTime!==null));
@@ -501,7 +497,11 @@ function renderSpicyLyrics(data){
     : body.Type==='Line'
       ? 'i guess this works idk. its like spotify but best we got for this song'
       : 'vat ze fuck is zhis bro. regular lyriks? i asked for ze FANCI lyriks';
-  loadIntoAMLL();
+  const hasCompleteWordTiming=lyricLines.some(line=>line.words.length) &&
+    lyricLines.every(line=>line.words.length && line.words.every(word=>Number.isFinite(word.time)&&Number.isFinite(word.endTime)));
+  rendererMode=body.Type==='Syllable' && hasCompleteWordTiming ? 'Syllable' :
+    body.Type==='Line' || lyricsAreSynced ? 'Line' : 'Static';
+  loadIntoSpicyRenderer();
 }
 function timeSeconds(value){
   if(!value) return null;
@@ -614,58 +614,87 @@ function renderLyrics(data){
   $('lyrics-meta').textContent=lyricsAreSynced
     ? 'TTML lyrics loaded · AMLL rendering enabled.'
     : 'TTML lyrics loaded · line timing only.';
-  loadIntoAMLL();
+  rendererMode=lyricsAreSynced ? 'Line' : 'Static';
+  loadIntoSpicyRenderer();
 }
-function loadIntoAMLL(){
-  const amllLines=lyricLines.map((line,index)=>{
-    const nextLineTime=lyricLines[index+1]?.time;
-    const lineStart=Math.round((line.time||0)*1000);
-    const words=(line.words||[]).map((word,wordIndex,array)=>{
-      const hasWordTiming=Number.isFinite(word.time);
-      const startTime=hasWordTiming?Math.round(word.time*1000):lineStart;
-      const endSeconds=Number.isFinite(word.endTime)?word.endTime:
-        Number.isFinite(word.end)?word.end:
-        (Number.isFinite(nextLineTime)?nextLineTime:(line.time||0)+2);
-      const text=String(word.text||'');
-      const needsSpace=typeof word.isPartOfWord==='boolean'
-        ? !word.isPartOfWord && wordIndex<array.length-1
-        : false;
-      return {
-        word:text+(needsSpace?' ':''),
-        startTime,
-        endTime:Math.max(startTime+1,Math.round(endSeconds*1000))
-      };
-    });
-    if(!words.length){
-      words.push({
-        word:line.text,
-        startTime:lineStart,
-        endTime:Math.max(lineStart+1,Math.round((Number.isFinite(nextLineTime)?nextLineTime:(line.time||0)+3)*1000))
-      });
-    }
-    const startTime=Number.isFinite(lineStart)?lineStart:0;
-    const inferredEnd=Math.max(...words.map(word=>word.endTime),startTime+1);
-    return {
-      words,
-      translatedLyric:'',
-      romanLyric:'',
-      startTime,
-      endTime:Math.max(inferredEnd,Number.isFinite(nextLineTime)?Math.round(nextLineTime*1000):0),
-      isBG:line.isBG===true,
-      isDuet:line.isDuet===true
-    };
+function loadIntoSpicyRenderer(){
+  clearLyricsArrays();
+  resetAnimator();
+  resetScrollManager();
+  lyricHost.replaceChildren();
+  lyricHost.scrollTop=0;
+
+  const sorted=[...lyricLines].sort((a,b)=>(a.time||0)-(b.time||0));
+  const lineData=sorted.map((line,index)=>{
+    const start=Number.isFinite(line.time)?line.time:0;
+    const nextStart=sorted[index+1]?.time;
+    const timedEnds=(line.words||[]).map(word=>word.endTime).filter(Number.isFinite);
+    const end=timedEnds.length ? Math.max(...timedEnds) :
+      (Number.isFinite(nextStart)&&nextStart>start ? nextStart : start+3);
+    const text=String(line.text||'');
+    const words=(line.words||[]).filter(word=>word.text).map(word=>({
+      Text:String(word.text),
+      StartTime:Number.isFinite(word.time)?word.time:start,
+      EndTime:Number.isFinite(word.endTime)&&word.endTime>(Number.isFinite(word.time)?word.time:start)
+        ? word.endTime : end,
+      IsPartOfWord:word.isPartOfWord===true
+    }));
+    return {line,start,end,text,words};
   });
+
+  if(rendererMode==='Static'){
+    applyStaticLyrics({Lines:lineData.map(item=>({
+      Text:item.text, TranslatedText:undefined, RomanizedText:undefined
+    }))},lyricHost);
+  }else if(rendererMode==='Line'){
+    applyLineLyrics({
+      StartTime:lineData[0]?.start||0,
+      Content:lineData.map(item=>({
+        Text:item.text, StartTime:item.start, EndTime:item.end,
+        OppositeAligned:item.line.isDuet===true
+      }))
+    },lyricHost);
+  }else{
+    applySyllableLyrics({
+      StartTime:lineData[0]?.start||0,
+      Type:'Syllable',
+      Content:lineData.map(item=>({
+        OppositeAligned:item.line.isDuet===true,
+        Lead:{
+          StartTime:item.start,
+          EndTime:item.end,
+          Syllables:item.words.length ? item.words : [{
+            Text:item.text,StartTime:item.start,EndTime:item.end,IsPartOfWord:false
+          }]
+        }
+      }))
+    },lyricHost);
+  }
+
+  // Keep backing vocals visually distinct without changing their source timing.
+  const renderedLines=Array.from(lyricHost.querySelectorAll('.line:not(.musical-line):not(.bg-line)'));
+  lineData.forEach((item,index)=>{
+    if(item.line.isBG && renderedLines[index]) renderedLines[index].classList.add('bg-line');
+  });
+  if(!scrollManagerInitialized){
+    initScrollManager(lyricHost);
+    scrollManagerInitialized=true;
+  }
   const currentTime=Math.round(currentPlaybackSeconds()*1000);
-  amllPlayer.setLyricLines(amllLines,currentTime);
-  amllPlayer.setCurrentTime(currentTime,true);
-  if(isPlaying) amllPlayer.resume(); else amllPlayer.pause();
+  const animationType=rendererMode==='Static'?'Static':'Syllable';
+  setLyricsTime(currentTime,animationType);
+  animateLyrics(currentTime,animationType);
+  scrollToActiveLine(lyricHost,true);
 }
 function currentPlaybackSeconds(){
   return latestProgressMs/1000+(isPlaying?(Date.now()-progressObservedAt)/1000:0);
 }
 function updateActiveLyric(){
-  if(!amllPlayer || $('lyrics-panel').hidden) return;
-  amllPlayer.setCurrentTime(Math.round(currentPlaybackSeconds()*1000));
+  if($('lyrics-panel').hidden) return;
+  const currentTime=Math.round(currentPlaybackSeconds()*1000);
+  const animationType=rendererMode==='Static'?'Static':'Syllable';
+  setLyricsTime(currentTime,animationType);
+  scrollToActiveLine(lyricHost);
 }
 let availableDevices = [];
 let selectedDeviceId = '';
@@ -811,10 +840,7 @@ async function playback(){
     if(['off','context','track'].includes(data.repeatState)){repeatState=data.repeatState;$('repeat-toggle').setAttribute('aria-pressed',String(repeatState!=='off'));$('repeat-toggle').setAttribute('aria-label','Repeat '+repeatState);$('repeat-toggle').title='Repeat '+repeatState;}
     renderProgress();
     isPlaying=!!data.playing;
-    if(amllPlayer){
-      amllPlayer.setCurrentTime(Math.round(latestProgressMs),true);
-      if(isPlaying) amllPlayer.resume(); else amllPlayer.pause();
-    }
+    updateActiveLyric();
     if (trackChanged) {
       // Test Apple directly from the browser, separately from the Worker experiment.
       searchAppleCoverDirect(data.track)
@@ -863,7 +889,7 @@ async function findLyrics({ automatic = false, trackId = currentTrackId } = {}){
   $('lyrics-meta').textContent = automatic
     ? 'NEW SONG!! asking Spicy Lyrics to find the words…'
     : 'asking Spicy Lyrics for the words. do your thing…';
-  if (amllPlayer) amllPlayer.setLyricLines([]);
+  lyricHost.replaceChildren();
   try {
     const data = await api('/api/lyrics');
     if (requestId !== lyricRequestId || trackId !== currentTrackId) return;
@@ -922,18 +948,19 @@ $('refresh-fancy-background').onclick=async()=>{
   }
 };
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('okay bye Spotify. see you later i guess.')}catch(e){say('Spotify would not let me leave. '+e.message)}};
-function animateAMLL(frameTime){
-  const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
-  lastFrameTime=frameTime;
-  if(amllPlayer){
-    amllPlayer.setCurrentTime(Math.round(currentPlaybackSeconds()*1000));
-    renderProgress();
-    amllPlayer.update(delta);
+function animateSpicyRenderer(){
+  const currentTime=Math.round(currentPlaybackSeconds()*1000);
+  if(!$('lyrics-panel').hidden){
+    const animationType=rendererMode==='Static'?'Static':'Syllable';
+    setLyricsTime(currentTime,animationType);
+    animateLyrics(currentTime,animationType);
+    scrollToActiveLine(lyricHost);
   }
+  renderProgress();
   updateBeatPulse();
-  requestAnimationFrame(animateAMLL);
+  requestAnimationFrame(animateSpicyRenderer);
 }
-requestAnimationFrame(animateAMLL);
+requestAnimationFrame(animateSpicyRenderer);
 const queryError=new URLSearchParams(location.search).get('spotify_error');
 if(queryError) say('Spotify connection error: '+queryError.replaceAll('_',' ')+'. something went wrong. check the app settings pls :(');
 connection();
