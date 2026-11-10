@@ -104,7 +104,6 @@ export class SpicyLyricsRenderer {
   private frame = (now: number): void => {
     const dt = this.lastFrame ? Math.min((now - this.lastFrame) / 1000, 0.05) : 0;
     this.lastFrame = now;
-    if (this.playing) this.currentTime += dt * 1000;
     for (const word of this.words) {
       const value = word.spring.Step(dt);
       const pct = Math.max(0, Math.min(1, value)) * 100;
