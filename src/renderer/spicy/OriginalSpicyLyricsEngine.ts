@@ -10,7 +10,7 @@ import { Lyrics } from "../utils/Lyrics/Animator/Main.ts";
 type AnyRecord = Record<string, any>;
 
 function createHost(host: HTMLElement) {
-  host.replaceChildren();
+  host.querySelector('.SpicyLyricsPage')?.remove();
   const page = document.createElement("div");
   page.className = "SpicyLyricsPage";
   const container = document.createElement("div");
@@ -47,7 +47,7 @@ export class OriginalSpicyLyricsEngine {
   }
 
   clear() {
-    this.host.replaceChildren();
+    this.host.querySelector('.SpicyLyricsPage')?.remove();
     LyricsObject.Types.Syllable.Lines = [];
     LyricsObject.Types.Line.Lines = [];
     LyricsObject.Types.Static.Lines = [];
