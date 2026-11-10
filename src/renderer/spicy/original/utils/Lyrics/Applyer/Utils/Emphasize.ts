@@ -1,4 +1,4 @@
-import { $simpleLyricsMode } from "../../../../utils/stores.ts";
+import { $simpleLyricsMode } from "../../../../stores.ts";
 import { ArabicPersianRegex } from "../../../Addons.ts";
 import { IdleEmphasisLyricsScale } from "../../Animator/Shared.ts";
 import { ConvertTime } from "../../ConvertTime.ts";
