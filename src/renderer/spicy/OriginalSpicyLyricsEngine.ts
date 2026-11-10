@@ -1,10 +1,10 @@
-import { setPageContainer } from "../components/Pages/PageView.ts";
-import { $lyricsContainerExists, $currentLyricsType } from "../utils/stores.ts";
-import { SpotifyPlayer } from "../components/Global/SpotifyPlayer.ts";
-import { LyricsObject } from "../utils/Lyrics/lyrics.ts";
-import { ApplySyllableLyrics } from "../utils/Lyrics/Applyer/Synced/Syllable.ts";
-import { ApplyLineLyrics } from "../utils/Lyrics/Applyer/Synced/Line.ts";
-import { ApplyStaticLyrics } from "../utils/Lyrics/Applyer/Static.ts";
+import { setPageContainer } from "./original/components/Pages/PageView.ts";
+import { $lyricsContainerExists, $currentLyricsType } from "./original/utils/stores.ts";
+import { SpotifyPlayer } from "./original/components/Global/SpotifyPlayer.ts";
+import { LyricsObject } from "./original/utils/Lyrics/lyrics.ts";
+import { ApplySyllableLyrics } from "./original/utils/Lyrics/Applyer/Synced/Syllable.ts";
+import { ApplyLineLyrics } from "./original/utils/Lyrics/Applyer/Synced/Line.ts";
+import { ApplyStaticLyrics } from "./original/utils/Lyrics/Applyer/Static.ts";
 
 type AnyRecord = Record<string, any>;
 
