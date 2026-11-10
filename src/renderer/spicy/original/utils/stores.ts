@@ -1,18 +1,18 @@
-/**
- * Lyric Thing browser adapter for the original Spicetify stores.
- * Store API intentionally matches nanostores' get/set shape used upstream.
- */
+/** Browser-side compatibility stores for the original Spicetify engine. */
 export function atom<T>(initial: T) {
   let value = initial;
   const listeners = new Set<(value: T) => void>();
-  return {
-    get: () => value,
-    set(next: T) { value = next; listeners.forEach(listener => listener(value)); },
-    subscribe(listener: (value: T) => void) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    }
+  const store = (() => value) as (() => T) & {
+    get: () => T;
+    set: (next: T) => void;
+    subscribe: (listener: (value: T) => void) => () => void;
+    listen: (listener: (value: T) => void) => () => void;
   };
+  store.get = () => value;
+  store.set = (next: T) => { value = next; listeners.forEach(listener => listener(value)); };
+  store.subscribe = (listener) => { listeners.add(listener); return () => listeners.delete(listener); };
+  store.listen = store.subscribe;
+  return store;
 }
 export const $lyricsContainerExists = atom(true);
 export const $minimalLyricsMode = atom(false);
