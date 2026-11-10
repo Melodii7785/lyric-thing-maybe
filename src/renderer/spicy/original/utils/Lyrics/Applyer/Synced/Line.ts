@@ -8,8 +8,8 @@ import {
   ScrollSimplebar,
 } from "../../../Scrolling/Simplebar/ScrollSimplebar.ts";
 import { ConvertTime } from "../../ConvertTime.ts";
-import { ClearLyricsPageContainer } from "../../fetchLyrics.ts";
-import isRtl from "../../isRtl.ts";
+import { ClearLyricsPageContainer } from "../../../fetchLyrics.ts";
+import isRtl from "../../../isRtl.ts";
 import {
   ClearLyricsContentArrays,
   LINE_SYNCED_CurrentLineLyricsObject,
