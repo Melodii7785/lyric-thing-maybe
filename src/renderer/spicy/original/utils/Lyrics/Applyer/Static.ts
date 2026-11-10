@@ -1,4 +1,4 @@
-import { $lyricsContainerExists } from "../../../utils/stores.ts";
+import { $lyricsContainerExists } from "../../../stores.ts";
 import { PageContainer } from "../../../components/Pages/PageView.ts";
 import { type StyleProperties, applyStyles, removeAllStyles } from "../../CSS/Styles.ts";
 import {
@@ -7,8 +7,8 @@ import {
   RecalculateScrollSimplebar,
   ScrollSimplebar,
 } from "../../Scrolling/Simplebar/ScrollSimplebar.ts";
-import { ClearLyricsPageContainer } from "../fetchLyrics.ts";
-import isRtl from "../isRtl.ts";
+import { ClearLyricsPageContainer } from "../../fetchLyrics.ts";
+import isRtl from "../../isRtl.ts";
 import {
   ClearLyricsContentArrays,
   LyricsObject,
