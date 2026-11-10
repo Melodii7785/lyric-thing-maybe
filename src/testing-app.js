@@ -388,6 +388,8 @@ async function api(path, options={}) {
 function clearTrack(){ $('track').hidden=true; $('nowbar').hidden=true; $('cover').style.display='none'; }
 function clearLyrics(){
   lyricLines=[];
+  lyricsAreSynced=false;
+  rendererMode='Static';
   clearLyricsArrays();
   resetAnimator();
   resetScrollManager();
@@ -616,8 +618,8 @@ function renderLyrics(data){
     return;
   }
   $('lyrics-meta').textContent=lyricsAreSynced
-    ? 'TTML lyrics loaded · AMLL rendering enabled.'
-    : 'TTML lyrics loaded · line timing only.';
+    ? 'TTML lyrics loaded · timed rendering enabled.'
+    : 'TTML lyrics loaded · checking available line timing.';
   rendererMode=hasCompleteWordTiming ? 'Syllable' : (lyricsAreSynced || hasLineTiming) ? 'Line' : 'Static';
   loadIntoSpicyRenderer();
 }
@@ -893,6 +895,9 @@ async function findLyrics({ automatic = false, trackId = currentTrackId } = {}){
   $('lyrics-meta').textContent = automatic
     ? 'NEW SONG!! asking Spicy Lyrics to find the words…'
     : 'asking Spicy Lyrics for the words. do your thing…';
+  clearLyricsArrays();
+  resetAnimator();
+  resetScrollManager();
   lyricHost.replaceChildren();
   try {
     const data = await api('/api/lyrics');
