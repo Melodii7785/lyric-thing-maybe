@@ -5,7 +5,6 @@ import { LyricsObject } from "../utils/Lyrics/lyrics.ts";
 import { ApplySyllableLyrics } from "../utils/Lyrics/Applyer/Synced/Syllable.ts";
 import { ApplyLineLyrics } from "../utils/Lyrics/Applyer/Synced/Line.ts";
 import { ApplyStaticLyrics } from "../utils/Lyrics/Applyer/Static.ts";
-import { Lyrics } from "../utils/Lyrics/Animator/Main.ts";
 
 type AnyRecord = Record<string, any>;
 
@@ -29,21 +28,14 @@ function createHost(host: HTMLElement) {
 export class OriginalSpicyLyricsEngine {
   private host: HTMLElement;
   private page: HTMLElement;
-  private playing = false;
 
   constructor(host: HTMLElement) {
     this.host = host;
     this.page = createHost(host);
   }
 
-  setPlaying(playing: boolean) {
-    this.playing = playing;
-  }
-
   setPosition(milliseconds: number) {
     SpotifyPlayer.setPosition(milliseconds);
-    Lyrics.TimeSetter(milliseconds);
-    if (this.playing) Lyrics.Animate(milliseconds);
   }
 
   clear() {
