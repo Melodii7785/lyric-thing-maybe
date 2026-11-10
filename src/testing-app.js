@@ -502,8 +502,9 @@ function renderSpicyLyrics(data){
       : 'vat ze fuck is zhis bro. regular lyriks? i asked for ze FANCI lyriks';
   const hasCompleteWordTiming=lyricLines.some(line=>line.words.length) &&
     lyricLines.every(line=>line.words.length && line.words.every(word=>Number.isFinite(word.time)&&Number.isFinite(word.endTime)));
+  const hasLineTiming=new Set(lyricLines.map(line=>line.time)).size>1;
   rendererMode=body.Type==='Syllable' && hasCompleteWordTiming ? 'Syllable' :
-    body.Type==='Line' || lyricsAreSynced ? 'Line' : 'Static';
+    body.Type==='Line' || lyricsAreSynced || hasLineTiming ? 'Line' : 'Static';
   loadIntoSpicyRenderer();
 }
 function timeSeconds(value){
