@@ -1,0 +1,64 @@
+/* Spicy AMLL renderer styles, scoped to Lyric Thing's experimental lyrics viewport. */
+#lyrics {
+  --DefaultLyricsSize: clamp(1.55rem, 4.4vw, 2.65rem);
+  --ArtworkGlowColor: 255, 255, 255;
+  --SpicyLyrics-LineSpacing: .65rem 0;
+  position: relative; overflow-y: auto; overflow-x: hidden; scroll-behavior: auto;
+  font-family: "SF Pro Display", "Roboto Flex", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+#lyrics .SpicyLyricsScrollContainer {
+  display: flex; flex-direction: column; width: 100%; min-height: 100%;
+  padding: 15vh 0 35vh;
+}
+#lyrics .line {
+  display: block; width: 100%; margin: var(--SpicyLyrics-LineSpacing); padding: 0 5%;
+  color: rgba(255,255,255,.52); font-size: var(--DefaultLyricsSize); font-weight: 700;
+  line-height: 1.18; letter-spacing: 0; text-align: start; unicode-bidi: plaintext;
+  white-space: pre-wrap; -webkit-text-fill-color: transparent;
+  -webkit-background-clip: text; background-clip: text;
+  background-image: linear-gradient(180deg, rgba(255,255,255,.9) var(--gradient-position, -20%),
+    rgba(255,255,255,.42) calc(var(--gradient-position, -20%) + 20%));
+  --gradient-position: -20%; --gradient-alpha: .85; --gradient-alpha-end: .5;
+  --text-shadow-blur-radius: 4px; --text-shadow-opacity: 0%;
+  will-change: transform, opacity; transition: opacity .2s ease;
+}
+#lyrics .line.Active {
+  color: #fff; opacity: 1; --gradient-position: 100%;
+  background-image: linear-gradient(180deg, var(--accent-hot, #ff0436) var(--gradient-position),
+    rgba(255,255,255,.62) calc(var(--gradient-position) + 20%));
+}
+#lyrics .line.Sung { opacity: .5; --gradient-position: 100%; }
+#lyrics .line.NotSung { opacity: .55; --gradient-position: -20%; }
+#lyrics .line .word, #lyrics .line .letter, #lyrics .line .letterGroup {
+  display: inline-block; white-space: pre-wrap;
+}
+#lyrics .word-group { display: inline-block; white-space: nowrap; }
+#lyrics .line .word:not(.PartOfWord, .dot, .LastWordInLine)::after,
+#lyrics .line .letterGroup:not(.PartOfWord, .dot, .LastWordInLine)::after {
+  content: ""; margin-inline-end: .3ch;
+}
+#lyrics .line.OppositeAligned { text-align: end; }
+#lyrics .line.rtl { direction: rtl; text-align: start; }
+#lyrics .line.bg-line { margin: -.2rem 0 .4rem; font-size: calc(var(--DefaultLyricsSize) * .75); opacity: .68; }
+#lyrics .line.musical-line {
+  display: flex; justify-content: center; line-height: 0; margin: .2rem 0; padding: 0; background: none;
+}
+#lyrics .dotGroup { display: flex; gap: .45rem; scale: 0; }
+#lyrics .dot { font-size: .8em; }
+#lyrics .line.static {
+  opacity: 1; color: rgba(255,255,255,.86); background-image: none;
+  -webkit-text-fill-color: currentColor; font-weight: 550; cursor: default;
+}
+#lyrics .HideLineBlur .line { --BlurAmount: 0px !important; }
+#lyrics .Credits {
+  margin-top: 2rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,.14);
+  color: rgba(255,255,255,.55); font-size: .78rem; text-align: center;
+}
+#lyrics .lyrics-spacer { width: 100%; height: 36vh; pointer-events: none; }
+@media (max-width: 600px) {
+  #lyrics { --DefaultLyricsSize: clamp(1.35rem, 6vw, 2.1rem); }
+  #lyrics .SpicyLyricsScrollContainer { padding-top: 10vh; padding-bottom: 22vh; }
+  #lyrics .line { padding-inline: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { #lyrics .line { transition: none; } }
