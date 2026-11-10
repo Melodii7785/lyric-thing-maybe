@@ -7,6 +7,7 @@ import '@applemusic-like-lyrics/core/style.css';
 const $ = id => document.getElementById(id);
 let poller = null;
 let currentTrackId = null;
+let currentAppleTrack = null;
 let lyricRequestId = 0;
 let lyricLines = [];
 let lyricsAreSynced = false;
@@ -29,7 +30,6 @@ let kawarpSourceUrl = '';
 let dynamicBackgroundEnabled = true;
 let ambientImageUrl = '';
 let nowbarMotionHls = null;
-let mobileMotionHls = null;
 let ambientRequestId = 0;
 let beatAnalysis = null;
 let beatAnalysisTrackId = null;
@@ -98,37 +98,19 @@ async function setAmbientBackground(imageUrl, force = false){
     console.warn('[Kawarp background failed]', error);
   }
 }
-async function loadMobileMotion(){
-  const video=$('mobile-motion');
-  if(!video) return;
-  if(mobileMotionHls){ mobileMotionHls.destroy(); mobileMotionHls=null; }
-  video.pause(); video.removeAttribute('src'); video.load(); video.style.display='none';
-  $('mobile-cover').style.display='block';
-  try{
-    const response=await fetch('/api/apple-motion',{credentials:'same-origin'});
-    if(!response.ok) throw new Error('no motion artwork');
-    const motion=await response.json();
-    // This is the whole point of the experiment: use Apple's tall variant.
-    if(!motion.tall) throw new Error('no tall motion artwork');
-    if(Hls.isSupported()){
-      mobileMotionHls=new Hls();
-      mobileMotionHls.on(Hls.Events.ERROR,(_event,data)=>{
-        if(data.fatal){ mobileMotionHls?.destroy(); mobileMotionHls=null; video.style.display='none'; $('mobile-cover').style.display='block'; }
-      });
-      mobileMotionHls.loadSource(motion.tall);
-      mobileMotionHls.attachMedia(video);
-    }else if(video.canPlayType('application/vnd.apple.mpegurl')) video.src=motion.tall;
-    else throw new Error('HLS not supported');
-    video.muted=true; video.loop=true; video.playsInline=true;
-    video.onloadeddata=()=>{ video.style.display='block'; $('mobile-cover').style.display='none'; video.play().catch(()=>{}); };
-    video.onerror=()=>{ video.style.display='none'; $('mobile-cover').style.display='block'; };
-  }catch{
-    video.pause(); video.style.display='none'; $('mobile-cover').style.display='block';
-  }
-}
-
-async function loadNowbarMotion(){
+async function loadNowbarMotion(fallbackImageUrl=''){
   const video=$('nowbar-motion');
+  const trackAtStart=currentTrackId;
+  const restoreStaticBackground=async()=>{
+    if(trackAtStart!==currentTrackId) return;
+    try{
+      const renderer=await getKawarp();
+      if(trackAtStart!==currentTrackId || !dynamicBackgroundEnabled) return;
+      if(fallbackImageUrl) await renderer.loadImage(fallbackImageUrl);
+    }catch(error){
+      console.warn('[Kawarp motion fallback failed]',error);
+    }
+  };
 
   // A new song starts with a clean slate. Otherwise the previous HLS stream
   // happily keeps playing when the new song has no Album Motion. Rude.
@@ -137,10 +119,14 @@ async function loadNowbarMotion(){
     nowbarMotionHls=null;
   }
   video.pause();
+  video.crossOrigin='anonymous';
+  video.onloadeddata=null;
+  video.onerror=null;
   video.removeAttribute('src');
   video.load();
   video.style.display='none';
   $('nowbar-cover').style.display='block';
+  void restoreStaticBackground();
 
   try{
     const response=await fetch('/api/apple-motion',{credentials:'same-origin'});
@@ -158,6 +144,7 @@ async function loadNowbarMotion(){
           nowbarMotionHls=null;
           video.style.display='none';
           $('nowbar-cover').style.display='block';
+          void restoreStaticBackground();
         }
       });
       nowbarMotionHls.loadSource(motion.square);
@@ -168,20 +155,43 @@ async function loadNowbarMotion(){
 
     video.muted=true; video.loop=true; video.playsInline=true;
     // Keep the normal cover visible until we have an actual video frame.
-    video.onloadeddata=()=>{
+    video.onloadeddata=async()=>{
+      if(trackAtStart!==currentTrackId) return;
       video.style.display='block';
       $('nowbar-cover').style.display='none';
+      try{
+        if(!('requestVideoFrameCallback' in HTMLVideoElement.prototype)){
+          throw new Error('requestVideoFrameCallback is not supported in this browser');
+        }
+        if(dynamicBackgroundEnabled){
+          const renderer=await getKawarp();
+          if(trackAtStart!==currentTrackId) return;
+          renderer.loadVideo(video,{
+            frameRate:12,
+            smoothing:120,
+            onError:error=>{
+              console.warn('[Kawarp could not sample Album Motion]',error);
+              void restoreStaticBackground();
+            }
+          });
+        }
+      }catch(error){
+        console.warn('[Kawarp Album Motion sync unavailable]',error);
+        void restoreStaticBackground();
+      }
       video.play().catch(()=>{});
     };
     video.onerror=()=>{
       video.style.display='none';
       $('nowbar-cover').style.display='block';
+      void restoreStaticBackground();
     };
   }catch{
     // No Album Motion for this song: the static cover we restored above stays.
     video.pause();
     video.style.display='none';
     $('nowbar-cover').style.display='block';
+    void restoreStaticBackground();
   }
 }
 
@@ -214,7 +224,7 @@ function setDynamicBackgroundEnabled(enabled){
   if(enabled && ambientImageUrl) void setAmbientBackground(ambientImageUrl, true);
 }
 // Tiny Apple-cover experiment: Apple documents JSONP callbacks for cross-site Search API requests.
-function searchAppleCoverDirect(track){
+function searchAppleCatalog(track, entity, term = [track.title, (track.artists || [])[0], track.album].filter(Boolean).join(' ')){
   return new Promise((resolve, reject) => {
     const callback = '__appleCover_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const script = document.createElement('script');
@@ -229,17 +239,7 @@ function searchAppleCoverDirect(track){
     window[callback] = data => {
       clearTimeout(timeout);
       cleanup();
-      const results = Array.isArray(data?.results) ? data.results : [];
-      const wantedTitle = String(track.title || '').toLowerCase();
-      const wantedArtist = String((track.artists || [])[0] || '').toLowerCase();
-      const best = results.find(item =>
-        String(item.trackName || '').toLowerCase() === wantedTitle &&
-        String(item.artistName || '').toLowerCase().includes(wantedArtist)
-      ) || results[0] || null;
-      if (best?.artworkUrl100) {
-        best.artworkUrlLarge = best.artworkUrl100.replace(/\d+x\d+(bb)?/i, '1500x1500bb');
-      }
-      resolve(best);
+      resolve(Array.isArray(data?.results) ? data.results : []);
     };
     script.onerror = () => {
       clearTimeout(timeout);
@@ -247,16 +247,138 @@ function searchAppleCoverDirect(track){
       reject(new Error('apple_cover_load_failed'));
     };
     const params = new URLSearchParams({
-      term: [track.title, (track.artists || [])[0], track.album].filter(Boolean).join(' '),
+      term,
       country: 'BR',
       media: 'music',
-      entity: 'song',
-      limit: '5',
+      entity,
+      limit: '10',
       callback
     });
     script.src = 'https://itunes.apple.com/search?' + params;
     document.head.appendChild(script);
   });
+}
+function lookupAppleId(collectionId){
+  return new Promise((resolve, reject) => {
+    if(!/^\d+$/.test(String(collectionId))) return reject(new Error('invalid_collection_id'));
+    const callback = '__appleLookup_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const cleanup = () => { script.remove(); try { delete window[callback]; } catch {} };
+    const timeout = setTimeout(() => { cleanup(); reject(new Error('apple_lookup_timeout')); }, 10000);
+    window[callback] = data => {
+      clearTimeout(timeout); cleanup();
+      resolve(Array.isArray(data?.results) ? data.results : []);
+    };
+    script.onerror = () => { clearTimeout(timeout); cleanup(); reject(new Error('apple_lookup_load_failed')); };
+    const params = new URLSearchParams({ id: String(collectionId), country: 'BR', callback });
+    script.src = 'https://itunes.apple.com/lookup?' + params;
+    document.head.appendChild(script);
+  });
+}
+async function searchAppleCoverDirect(track){
+  const normalize = value => String(value || '').toLowerCase().normalize('NFD')
+    .replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const wantedArtist = normalize((track.artists || [])[0]);
+  const wantedAlbum = normalize(track.album);
+  const wantedTitle = normalize(track.title);
+  const artistQuery = (track.artists || [])[0] || '';
+
+  // Search all three catalog entity types. The song verifies the recording;
+  // the album search determines the artwork release; the artist search
+  // disambiguates artists with similar names.
+  const [songResults, albumResults, artistResults] = await Promise.all([
+    searchAppleCatalog(track, 'song', [track.title, artistQuery].filter(Boolean).join(' ')),
+    searchAppleCatalog(track, 'album', [track.album, artistQuery].filter(Boolean).join(' ')).catch(error => {
+      console.warn('[Apple album search failed]', error);
+      return [];
+    }),
+    artistQuery
+      ? searchAppleCatalog(track, 'musicArtist', artistQuery).catch(error => {
+          console.warn('[Apple artist search failed]', error);
+          return [];
+        })
+      : Promise.resolve([])
+  ]);
+
+  const artistMatch = artistResults
+    .map(item => {
+      const name = normalize(item.artistName);
+      let score = 0;
+      if (name === wantedArtist) score += 100;
+      else if (name && wantedArtist && (name.includes(wantedArtist) || wantedArtist.includes(name))) score += 50;
+      return { item, score };
+    })
+    .sort((a,b) => b.score-a.score)
+    .find(entry => entry.score >= 50)?.item || null;
+  const matchedArtistId = artistMatch?.artistId || null;
+
+  const songMatch = songResults
+    .map(item => {
+      const title = normalize(item.trackName);
+      const artist = normalize(item.artistName);
+      let score = 0;
+      if (title === wantedTitle) score += 100;
+      else if (title && wantedTitle && (title.includes(wantedTitle) || wantedTitle.includes(title))) score += 40;
+      if (wantedArtist && (artist === wantedArtist || artist.includes(wantedArtist) || wantedArtist.includes(artist))) score += 50;
+      if (matchedArtistId && item.artistId === matchedArtistId) score += 25;
+      return { item, score };
+    })
+    .sort((a,b) => b.score-a.score)
+    .find(entry => entry.score >= 150)?.item || null;
+
+  // Spotify's album field is the release the user is listening to. Match that
+  // release directly instead of trusting the song result's collectionId:
+  // a song search can legitimately return a single (e.g. "K.O. - Single").
+  const albumMatch = albumResults
+    .map(item => {
+      const artist = normalize(item.artistName);
+      const album = normalize(item.collectionName || item.trackName);
+      let score = 0;
+      if (album === wantedAlbum) score += 100;
+      else if (album && wantedAlbum && (album.includes(wantedAlbum) || wantedAlbum.includes(album))) score += 45;
+      if (wantedArtist && (artist === wantedArtist || artist.includes(wantedArtist) || wantedArtist.includes(artist))) score += 50;
+      if (matchedArtistId && item.artistId === matchedArtistId) score += 25;
+      return { item, score };
+    })
+    .sort((a,b) => b.score-a.score)
+    .find(entry => entry.score >= 150)?.item || null;
+
+  // Resolve the selected album's own ID for canonical collection artwork.
+  let exactAlbum = null;
+  if (albumMatch?.collectionId) {
+    try {
+      const lookupResults = await lookupAppleId(albumMatch.collectionId);
+      exactAlbum = lookupResults.find(item =>
+        (item.wrapperType === 'collection' || item.collectionId) &&
+        normalize(item.collectionName) === wantedAlbum &&
+        (!matchedArtistId || item.artistId === matchedArtistId)
+      ) || lookupResults.find(item => item.wrapperType === 'collection') || null;
+    } catch(error) {
+      console.warn('[Apple album collection lookup failed]', error);
+    }
+  }
+
+  const best = songMatch || albumMatch;
+  if (!best) return null;
+
+  // Prefer the exact Spotify-album match, then its ID lookup, and only then
+  // fall back to the song result's artwork.
+  const artworkSource = exactAlbum?.artworkUrl100 ? exactAlbum
+    : albumMatch?.artworkUrl100 ? albumMatch
+    : best;
+  if (artworkSource?.artworkUrl100) {
+    best.artworkUrlLarge = artworkSource.artworkUrl100.replace(/\d+x\d+(bb)?/i, '3000x3000bb');
+  }
+  best.albumArtworkSource = exactAlbum?.artworkUrl100 ? 'spotify-album-collection-id'
+    : albumMatch?.artworkUrl100 ? 'spotify-album-search'
+    : 'song-fallback';
+  best.albumArtworkName = exactAlbum?.collectionName || albumMatch?.collectionName || null;
+  best.artistLookupName = artistMatch?.artistName || null;
+  best.artistLookupId = matchedArtistId;
+  best.songCollectionName = songMatch?.collectionName || null;
+  best.songCollectionId = songMatch?.collectionId || null;
+  best.albumCollectionId = albumMatch?.collectionId || null;
+  return best;
 }
 window.testAppleCover = searchAppleCoverDirect;
 function say(message){ $('status').textContent = message; }
@@ -284,9 +406,39 @@ function setAttribution(source, uploadAttribution){
   const provider=names[source] || 'Unknown source';
   target.append('Lyrics provided by ');
   const providerLink=document.createElement('a');
-  providerLink.href=source==='lrc.red'?'https://lrc.red/':source==='spicy_lyrics'?'https://spicylyrics.org/': 'https://developers.spicylyrics.org/';
+  // Apple Music attribution should lead to the actual track we already found
+  // through the iTunes lookup, not the generic developer site.
+  providerLink.href=source==='apple_music'
+    ? (currentAppleTrack?.trackViewUrl || 'https://music.apple.com/')
+    : source==='lrc.red'
+      ? 'https://lrc.red/'
+      : source==='spicy_lyrics'
+        ? 'https://spicylyrics.org/'
+        : 'https://developers.spicylyrics.org/';
   providerLink.target='_blank'; providerLink.rel='noreferrer'; providerLink.style.color='#f49ac2'; providerLink.textContent=provider;
   target.append(providerLink);
+
+  // lrc.red lyrics also get a direct link to the matching Apple Music track.
+  if(source==='lrc.red' && currentAppleTrack?.trackViewUrl){
+    target.append(' · ');
+    const appleLink=document.createElement('a');
+    appleLink.href=currentAppleTrack.trackViewUrl;
+    appleLink.target='_blank'; appleLink.rel='noreferrer';
+    appleLink.style.color='#f49ac2';
+    appleLink.textContent='View on Apple Music';
+    target.append(appleLink);
+  }
+
+  // Community lyrics can still point people to the matched Apple Music track.
+  if(source==='spicy_lyrics' && currentAppleTrack?.trackViewUrl){
+    target.append(' · ');
+    const appleLink=document.createElement('a');
+    appleLink.href=currentAppleTrack.trackViewUrl;
+    appleLink.target='_blank'; appleLink.rel='noreferrer';
+    appleLink.style.color='#f49ac2';
+    appleLink.textContent='View on Apple Music';
+    target.append(appleLink);
+  }
   if(source==='spicy_lyrics' && uploadAttribution){
     const addCredit=(label,person)=>{
       if(!person || !person.username) return;
@@ -301,26 +453,42 @@ function setAttribution(source, uploadAttribution){
     addCredit('made by',uploadAttribution.Maker);
   }
 }
+function spicyVocalWords(vocal, fallbackTime=0){
+  const syllables=Array.isArray(vocal?.Syllables)?vocal.Syllables.map(s=>({
+    text:typeof s.Text==='string'?s.Text:'',
+    time:Number.isFinite(s.StartTime)?s.StartTime:null,
+    endTime:Number.isFinite(s.EndTime)?s.EndTime:null,
+    isPartOfWord:s.IsPartOfWord===true
+  })).filter(s=>s.text):[];
+  const text=syllables.length
+    ? syllables.map((s,i)=>s.text+(!s.isPartOfWord&&i<syllables.length-1?' ':'')).join('')
+    : (vocal?.Text||vocal?.TransliteratedText||vocal?.TranslatedText||'');
+  const candidateTimes=[vocal?.StartTime,syllables[0]?.time,fallbackTime];
+  const time=candidateTimes.find(t=>typeof t==='number'&&Number.isFinite(t));
+  return {time:time??0,text,words:syllables};
+}
 function renderSpicyLyrics(data){
   clearLyrics();
   $('lyrics-panel').hidden=false;
   const body=data.spicyLyrics||{};
   const content=Array.isArray(body.Content)?body.Content:[];
-  lyricLines=content.map(entry=>{
-    const lead=entry?.Lead||{};
-    const syllables=Array.isArray(lead.Syllables)?lead.Syllables.map(s=>({
-      text:typeof s.Text==='string'?s.Text:'',
-      time:Number.isFinite(s.StartTime)?s.StartTime:null,
-      endTime:Number.isFinite(s.EndTime)?s.EndTime:null,
-      isPartOfWord:s.IsPartOfWord===true
-    })).filter(s=>s.text):[];
-    const text=syllables.length
-      ? syllables.map((s,i)=>s.text+(!s.isPartOfWord&&i<syllables.length-1?' ':'')).join('')
-      : (lead.Text||lead.TransliteratedText||lead.TranslatedText||entry?.Text||'');
-    const candidateTimes=[lead.StartTime,entry?.StartTime,syllables[0]?.time,body.StartTime];
-    const time=candidateTimes.find(t=>typeof t==='number'&&Number.isFinite(t));
-    return {time:time??0,text,words:syllables};
-  }).filter(line=>line.text.trim());
+  lyricLines=content.flatMap(entry=>{
+    const lead=spicyVocalWords(entry?.Lead,entry?.StartTime??body.StartTime??0);
+    const lines=[];
+    // Spicy Lyrics marks opposite-side duet vocals explicitly. AMLL's
+    // isDuet flag applies the opposite/right-side lyric alignment.
+    const oppositeAligned=entry?.OppositeAligned===true;
+    if(lead.text.trim()) lines.push({...lead,isBG:false,isDuet:oppositeAligned});
+    // Spicy Lyrics exposes backing vocals as a separate Background[] array.
+    // Keep each backing part as its own AMLL line instead of flattening it
+    // into the lead vocal (which loses the background-vocal styling).
+    const backgrounds=Array.isArray(entry?.Background)?entry.Background:[];
+    for(const vocal of backgrounds){
+      const background=spicyVocalWords(vocal,entry?.StartTime??lead.time);
+      if(background.text.trim()) lines.push({...background,isBG:true,isDuet:false});
+    }
+    return lines;
+  }).sort((a,b)=>a.time-b.time);
   setAttribution(body.source,body.UploadAttribution);
   if(!lyricLines.length){
     $('lyrics-meta').textContent='Spicy Lyrics returned a response, but it contained no renderable lyric lines.';
@@ -337,7 +505,9 @@ function renderSpicyLyrics(data){
 }
 function timeSeconds(value){
   if(!value) return null;
-  const parts=value.trim().split(':');
+  const input=value.trim();
+  if(/^\d+(?:\.\d+)?s$/.test(input)) return Number(input.slice(0,-1));
+  const parts=input.split(':');
   if(parts.length===3) return Number(parts[0])*3600+Number(parts[1])*60+Number(parts[2]);
   if(parts.length===2) return Number(parts[0])*60+Number(parts[1]);
   return null;
@@ -345,16 +515,91 @@ function timeSeconds(value){
 function parseTtml(value){
   const xml=new DOMParser().parseFromString(value,'application/xml');
   if(xml.querySelector('parsererror')) throw new Error('invalid_ttml');
-  return Array.from(xml.getElementsByTagNameNS('*','p')).map(p=>{
-    const time=timeSeconds(p.getAttribute('begin'));
-    const spans=Array.from(p.getElementsByTagNameNS('*','span')).map(span=>({
-      text:span.textContent||'',
-      time:timeSeconds(span.getAttribute('begin')),
-      end:timeSeconds(span.getAttribute('end'))
-    })).filter(word=>word.text);
-    const text=spans.length ? spans.map(word=>word.text).join('') : (p.textContent||'').trim();
-    return {time:time??0,text,words:spans};
-  }).filter(line=>line.text.trim()).sort((a,b)=>a.time-b.time);
+  const ttmNamespace='http://www.w3.org/ns/ttml#metadata';
+  const xmlNamespace='http://www.w3.org/XML/1998/namespace';
+  const agentIds=Array.from(xml.getElementsByTagNameNS(ttmNamespace,'agent'))
+    .map(agent=>agent.getAttributeNS(xmlNamespace,'id')||agent.getAttribute('xml:id'))
+    .filter(Boolean);
+  const distinctAgents=[...new Set(Array.from(xml.getElementsByTagNameNS('*','p'))
+    .map(p=>p.getAttributeNS(ttmNamespace,'agent')||p.getAttribute('ttm:agent'))
+    .filter(Boolean))];
+  const hasMultipleSingers=distinctAgents.length>1;
+  const firstAgent=distinctAgents[0]||agentIds[0]||null;
+  const getRole=element=>element.getAttributeNS(ttmNamespace,'role')||element.getAttribute('ttm:role')||'';
+  const parseWords=nodes=>{
+    const words=[];
+    for(const node of nodes){
+      if(node.nodeType===Node.TEXT_NODE){
+        if(node.textContent) words.push({text:node.textContent,time:null,endTime:null});
+        continue;
+      }
+      if(node.nodeType!==Node.ELEMENT_NODE) continue;
+      const element=node;
+      if(getRole(element)) continue;
+      if(element.localName==='span'){
+        const nested=Array.from(element.childNodes).filter(child=>
+          !(child.nodeType===Node.ELEMENT_NODE && getRole(child)==='x-bg'));
+        if(nested.some(child=>child.nodeType===Node.ELEMENT_NODE)){
+          words.push(...parseWords(nested));
+        }else{
+          const text=element.textContent||'';
+          if(text) words.push({text,time:timeSeconds(element.getAttribute('begin')),endTime:timeSeconds(element.getAttribute('end'))});
+        }
+      }else{
+        words.push(...parseWords(Array.from(element.childNodes)));
+      }
+    }
+    return words.filter(word=>word.text);
+  };
+  const parseBackgroundWords=element=>{
+    const words=[];
+    const visit=node=>{
+      for(const child of Array.from(node.childNodes||[])){
+        if(child.nodeType===Node.TEXT_NODE){
+          if(child.textContent) words.push({text:child.textContent,time:null,endTime:null});
+        }else if(child.nodeType===Node.ELEMENT_NODE){
+          const role=getRole(child);
+          if(role==='x-translation'||role==='x-roman') continue;
+          if(child.localName==='span'){
+            const nested=Array.from(child.childNodes).some(n=>n.nodeType===Node.ELEMENT_NODE);
+            if(nested) visit(child);
+            else if(child.textContent) words.push({text:child.textContent,time:timeSeconds(child.getAttribute('begin')),endTime:timeSeconds(child.getAttribute('end'))});
+          }else visit(child);
+        }
+      }
+    };
+    visit(element);
+    return words.filter(word=>word.text);
+  };
+  const parsed=[];
+  for(const p of Array.from(xml.getElementsByTagNameNS('*','p'))){
+    const lineTime=timeSeconds(p.getAttribute('begin'))??0;
+    const agent=p.getAttributeNS(ttmNamespace,'agent')||p.getAttribute('ttm:agent')||null;
+    const isDuet=hasMultipleSingers && !!agent && agent!==firstAgent;
+    const directChildren=Array.from(p.childNodes);
+    const mainWords=parseWords(directChildren);
+    const mainText=mainWords.map(word=>word.text).join('').trim();
+    if(mainText){
+      parsed.push({time:lineTime,text:mainText,words:mainWords,isBG:false,isDuet});
+    }
+    const backgrounds=[];
+    const collectBackgrounds=node=>{
+      for(const child of Array.from(node.childNodes||[])){
+        if(child.nodeType!==Node.ELEMENT_NODE) continue;
+        if(getRole(child)==='x-bg') backgrounds.push(child);
+        else collectBackgrounds(child);
+      }
+    };
+    collectBackgrounds(p);
+    for(const background of backgrounds){
+      const words=parseBackgroundWords(background);
+      const text=words.map(word=>word.text).join('').trim();
+      if(!text) continue;
+      const bgTime=timeSeconds(background.getAttribute('begin'))??words.find(word=>word.time!==null)?.time??lineTime;
+      parsed.push({time:bgTime,text,words,isBG:true,isDuet:false});
+    }
+  }
+  return parsed.sort((a,b)=>a.time-b.time);
 }
 function renderLyrics(data){
   clearLyrics();
@@ -406,8 +651,8 @@ function loadIntoAMLL(){
       romanLyric:'',
       startTime,
       endTime:Math.max(inferredEnd,Number.isFinite(nextLineTime)?Math.round(nextLineTime*1000):0),
-      isBG:false,
-      isDuet:false
+      isBG:line.isBG===true,
+      isDuet:line.isDuet===true
     };
   });
   const currentTime=Math.round(currentPlaybackSeconds()*1000);
@@ -428,13 +673,6 @@ let shuffleEnabled = false;
 let repeatState = 'off';
 let trackDurationMs = 0;
 let seekingProgress = false;
-function updateMobileProgress(){
-  const bar=$('mobile-progress-bar'); if(!bar) return;
-  const p=Math.min(trackDurationMs,Math.max(0,currentPlaybackSeconds()*1000));
-  if(!bar.matches(':active')) bar.value=trackDurationMs?String(Math.round(p/trackDurationMs*1000)):'0';
-  $('mobile-progress-current').textContent=formatTime(p);
-  $('mobile-progress-duration').textContent=formatTime(trackDurationMs);
-}
 function formatTime(ms){const s=Math.max(0,Math.floor((Number(ms)||0)/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
 function renderProgress(){const bar=$('progress-bar');if(!bar)return;const p=Math.min(trackDurationMs,Math.max(0,currentPlaybackSeconds()*1000));if(!seekingProgress)bar.value=trackDurationMs?String(Math.round(p/trackDurationMs*1000)):'0';bar.disabled=!trackDurationMs;$('progress-current').textContent=formatTime(p);$('progress-duration').textContent=formatTime(trackDurationMs);}
 function selectedDevice(){
@@ -550,25 +788,20 @@ async function playback(){
     $('playstate').textContent=data.playing ? 'Playing' : 'Paused';
     $('play-pause').innerHTML=data.playing?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM15 5h3v14h-3z" fill="currentColor"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>';
     $('play-pause').setAttribute('aria-label',data.playing?'Pause':'Play');
-    $('mobile-play-pause').innerHTML=data.playing?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM15 5h3v14h-3z" fill="currentColor"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z" fill="currentColor"/></svg>';
-    $('mobile-play-pause').setAttribute('aria-label',data.playing?'Pause':'Play');
-    if($('mobile-player')) $('mobile-player').hidden=false;
-    $('mobile-title').textContent=data.track.title;
-    $('mobile-artist').textContent=(data.track.artists||[]).join(', ') || 'Unknown artist';
-    $('mobile-year').textContent=data.track.year ? ' · '+data.track.year : '';
     if(data.track.image){
       $('cover').src=data.track.image;
       $('cover').style.display='block';
-      const nowbarCover=$('nowbar-cover');
-      const newImage=data.track.image;
-      const mobileCover=$('mobile-cover');
-      if(mobileCover.src !== newImage){ mobileCover.src=newImage; loadMobileMotion(); }
-      if(nowbarCover.src !== newImage){
+
+      // Don't re-apply Spotify's cover on every playback poll. The Apple
+      // lookup may have already upgraded the NowBar artwork for this track.
+      // Only give Spotify's image the initial/fallback job when the track changes.
+      if(trackChanged){
+        const nowbarCover=$('nowbar-cover');
         nowbarCover.classList.remove('art-changing');
         void nowbarCover.offsetWidth;
-        nowbarCover.src=newImage;
+        nowbarCover.src=data.track.image;
         nowbarCover.classList.add('art-changing');
-        loadNowbarMotion();
+        loadNowbarMotion(data.track.image || '');
       }
     } else $('cover').style.display='none';
     latestProgressMs=Number(data.progressMs||0);
@@ -577,7 +810,6 @@ async function playback(){
     if(typeof data.shuffleState==='boolean'){shuffleEnabled=data.shuffleState;$('shuffle-toggle').setAttribute('aria-pressed',String(shuffleEnabled));}
     if(['off','context','track'].includes(data.repeatState)){repeatState=data.repeatState;$('repeat-toggle').setAttribute('aria-pressed',String(repeatState!=='off'));$('repeat-toggle').setAttribute('aria-label','Repeat '+repeatState);$('repeat-toggle').title='Repeat '+repeatState;}
     renderProgress();
-    updateMobileProgress();
     isPlaying=!!data.playing;
     if(amllPlayer){
       amllPlayer.setCurrentTime(Math.round(latestProgressMs),true);
@@ -588,8 +820,18 @@ async function playback(){
       searchAppleCoverDirect(data.track)
         .then(result => {
           console.log('[Apple cover test]', result);
+          if(nextTrackId === currentTrackId) currentAppleTrack = result || null;
           const appleArtwork = result?.artworkUrlLarge || result?.artworkUrl100;
-          if(appleArtwork) setAmbientBackground(appleArtwork);
+          if(appleArtwork){
+            // One Apple lookup, two jobs: Kawarp keeps its 1500px source and
+            // the static NowBar reuses that same result.
+            const nowbarCover=$('nowbar-cover');
+            nowbarCover.classList.remove('art-changing');
+            void nowbarCover.offsetWidth;
+            nowbarCover.src=appleArtwork;
+            nowbarCover.classList.add('art-changing');
+            setAmbientBackground(appleArtwork);
+          }
           else if(data.track.image) setAmbientBackground(data.track.image);
         })
         .catch(error => {
@@ -646,7 +888,7 @@ async function findLyrics({ automatic = false, trackId = currentTrackId } = {}){
 }
 function startPolling(){
   stopPolling();
-  poller=setInterval(playback,1000);
+  poller=setInterval(playback,2000);
 }
 function stopPolling(){
   if(poller) clearInterval(poller);
@@ -657,10 +899,6 @@ $('check').onclick=playback;
 $('refresh-devices').onclick=loadDevices;
 $('spotify-device').onchange=()=>{selectedDeviceId=$('spotify-device').value;const device=availableDevices.find(item=>item.id===selectedDeviceId);if(device)$('device-status').textContent='Selected '+device.name+'.';};
 $('play-pause').onclick=()=>playerCommand(isPlaying?'pause':'play');
-$('mobile-play-pause').onclick=()=>playerCommand(isPlaying?'pause':'play');
-$('mobile-previous').onclick=()=>playerCommand('previous');
-$('mobile-next').onclick=()=>playerCommand('next');
-$('mobile-progress-bar').addEventListener('change',async()=>{const position=Math.round(Number($('mobile-progress-bar').value)/1000*trackDurationMs);try{await api('/api/spotify/player/seek',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({position_ms:position,device_id:selectedDevice()||undefined})});latestProgressMs=position;progressObservedAt=Date.now();}catch(error){$('device-status').textContent='could not skip to that bit: '+error.message+' :(';}});
 $('previous-track').onclick=()=>playerCommand('previous');
 $('next-track').onclick=()=>playerCommand('next');
 $('shuffle-toggle').onclick=()=>playerCommand('shuffle',{state:!shuffleEnabled});
@@ -690,7 +928,6 @@ function animateAMLL(frameTime){
   if(amllPlayer){
     amllPlayer.setCurrentTime(Math.round(currentPlaybackSeconds()*1000));
     renderProgress();
-    updateMobileProgress();
     amllPlayer.update(delta);
   }
   updateBeatPulse();
