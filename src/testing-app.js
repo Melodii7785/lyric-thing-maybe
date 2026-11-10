@@ -492,6 +492,7 @@ function renderSpicyLyrics(data){
     return;
   }
   const hasSyllableTiming=lyricLines.some(line=>line.words.some(word=>word.time!==null&&word.endTime!==null));
+  lyricsAreSynced=hasSyllableTiming;
   $('lyrics-meta').textContent=body.Type==='Syllable'&&hasSyllableTiming
     ? 'we did it evergbkdy. the lyrics are SYLLABLE SYNCed. three cheers for tecknologi!!.'
     : body.Type==='Line'
@@ -606,7 +607,10 @@ function renderLyrics(data){
   $('lyrics-panel').hidden=false;
   setAttribution('lrc.red');
   lyricLines=parseTtml(data.ttml||'');
-  lyricsAreSynced=lyricLines.some(line=>line.words.some(word=>word.time!==null));
+  lyricsAreSynced=lyricLines.some(line=>line.words.some(word=>Number.isFinite(word.time)&&Number.isFinite(word.endTime)));
+  const hasCompleteWordTiming=lyricLines.some(line=>line.words.length) &&
+    lyricLines.every(line=>line.words.length && line.words.every(word=>Number.isFinite(word.time)&&Number.isFinite(word.endTime)));
+  const hasLineTiming=new Set(lyricLines.map(line=>line.time)).size>1;
   if(!lyricLines.length){
     $('lyrics-meta').textContent='lrc.red returned a TTML file, but it did not contain readable lyric lines.';
     return;
@@ -614,7 +618,7 @@ function renderLyrics(data){
   $('lyrics-meta').textContent=lyricsAreSynced
     ? 'TTML lyrics loaded · AMLL rendering enabled.'
     : 'TTML lyrics loaded · line timing only.';
-  rendererMode=lyricsAreSynced ? 'Line' : 'Static';
+  rendererMode=hasCompleteWordTiming ? 'Syllable' : (lyricsAreSynced || hasLineTiming) ? 'Line' : 'Static';
   loadIntoSpicyRenderer();
 }
 function loadIntoSpicyRenderer(){
