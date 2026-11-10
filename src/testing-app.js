@@ -2,6 +2,8 @@ import '@fontsource-variable/inter';
 import Hls from 'hls.js';
 // Keep the verified app.js fix on a fresh commit so CI can run again.
 import { SpicyLyricsRenderer } from './renderer/spicy/SpicyLyricsRenderer.ts';
+import { OriginalSpicyLyricsEngine } from './renderer/spicy/OriginalSpicyLyricsEngine.ts';
+import './renderer/spicy/original/css/Lyrics/Mixed.css';
 
 const $ = id => document.getElementById(id);
 let poller = null;
@@ -11,6 +13,7 @@ let lyricRequestId = 0;
 let lyricLines = [];
 let lyricsAreSynced = false;
 let amllPlayer = new SpicyLyricsRenderer();
+let originalSpicyEngine = new OriginalSpicyLyricsEngine($('lyrics'));
 let lastFrameTime = null;
 const lyricHost = $('lyrics');
 lyricHost.appendChild(amllPlayer.getElement());
@@ -390,6 +393,7 @@ async function api(path, options={}) {
 function clearTrack(){ $('track').hidden=true; $('nowbar').hidden=true; $('cover').style.display='none'; }
 function clearLyrics(){
   lyricLines=[];
+  originalSpicyEngine.clear();
   if(amllPlayer){
     amllPlayer.setLyricLines([]);
     amllPlayer.setCurrentTime(0, true);
@@ -500,7 +504,10 @@ function renderSpicyLyrics(data){
     : body.Type==='Line'
       ? 'i guess this works idk. its like spotify but best we got for this song'
       : 'vat ze fuck is zhis bro. regular lyriks? i asked for ze FANCI lyriks';
-  loadIntoAMLL();
+  const applied = originalSpicyEngine.apply(body);
+  originalSpicyEngine.setPosition(Math.round(currentPlaybackSeconds()*1000));
+  originalSpicyEngine.setPlaying(isPlaying);
+  if (!applied) $('lyrics-meta').textContent='the original Spicy Lyrics renderer could not apply this payload. check the response type and content.';
 }
 function timeSeconds(value){
   if(!value) return null;
@@ -810,6 +817,8 @@ async function playback(){
     if(['off','context','track'].includes(data.repeatState)){repeatState=data.repeatState;$('repeat-toggle').setAttribute('aria-pressed',String(repeatState!=='off'));$('repeat-toggle').setAttribute('aria-label','Repeat '+repeatState);$('repeat-toggle').title='Repeat '+repeatState;}
     renderProgress();
     isPlaying=!!data.playing;
+    originalSpicyEngine.setPosition(Math.round(latestProgressMs));
+    originalSpicyEngine.setPlaying(isPlaying);
     if(amllPlayer){
       amllPlayer.setCurrentTime(Math.round(latestProgressMs),true);
       if(isPlaying) amllPlayer.resume(); else amllPlayer.pause();
@@ -922,6 +931,8 @@ $('refresh-fancy-background').onclick=async()=>{
 };
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('okay bye Spotify. see you later i guess.')}catch(e){say('Spotify would not let me leave. '+e.message)}};
 function animateAMLL(frameTime){
+  originalSpicyEngine.setPosition(Math.round(currentPlaybackSeconds()*1000));
+  originalSpicyEngine.setPlaying(isPlaying);
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
   lastFrameTime=frameTime;
   if(amllPlayer){
