@@ -506,7 +506,6 @@ function renderSpicyLyrics(data){
       : 'vat ze fuck is zhis bro. regular lyriks? i asked for ze FANCI lyriks';
   const applied = originalSpicyEngine.apply(body);
   originalSpicyEngine.setPosition(Math.round(currentPlaybackSeconds()*1000));
-  originalSpicyEngine.setPlaying(isPlaying);
   if (!applied) $('lyrics-meta').textContent='the original Spicy Lyrics renderer could not apply this payload. check the response type and content.';
 }
 function timeSeconds(value){
@@ -818,7 +817,6 @@ async function playback(){
     renderProgress();
     isPlaying=!!data.playing;
     originalSpicyEngine.setPosition(Math.round(latestProgressMs));
-    originalSpicyEngine.setPlaying(isPlaying);
     if(amllPlayer){
       amllPlayer.setCurrentTime(Math.round(latestProgressMs),true);
       if(isPlaying) amllPlayer.resume(); else amllPlayer.pause();
