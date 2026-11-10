@@ -52,7 +52,13 @@ export class SpicyLyricsRenderer {
       for (const word of line.words) {
         const span = document.createElement("span");
         span.className = "word";
-        span.textContent = word.word;
+        const parts = SplitLetters(word.word);
+        for (const part of parts) {
+          const letter = document.createElement("span");
+          letter.className = "letter";
+          letter.textContent = part;
+          span.appendChild(letter);
+        }
         row.appendChild(span);
         this.words.push({ element: span, start: word.startTime, end: Math.max(word.startTime + 1, word.endTime), spring: new Spring(0, 3.2, 0.82) });
       }
