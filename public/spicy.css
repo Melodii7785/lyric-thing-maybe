@@ -6,5 +6,6 @@
 .spicy-lyrics-renderer .line.bg-line{font-size:clamp(1rem,2.2vw,1.35rem);opacity:.62}
 .spicy-lyrics-renderer .line.duet-line{justify-content:flex-end;text-align:right}
 .spicy-lyrics-renderer .word{display:inline-block;background:linear-gradient(90deg,var(--accent-hot) 0%,var(--accent-hot) var(--spicy-fill,0%),currentColor var(--spicy-fill,0%),currentColor 100%);background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent;transition:filter .15s ease}
+.spicy-lyrics-renderer .word .letter{background:linear-gradient(90deg,var(--accent-hot) 0%,var(--accent-hot) var(--spicy-fill,0%),currentColor var(--spicy-fill,0%),currentColor 100%);background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .spicy-lyrics-renderer .line.Active .word{filter:drop-shadow(0 0 12px rgba(255,4,54,.12))}
 @media(prefers-reduced-motion:reduce){.spicy-lyrics-renderer .line{transition:none}}
