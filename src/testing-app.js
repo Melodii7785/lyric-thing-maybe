@@ -1,8 +1,7 @@
 import '@fontsource-variable/inter';
 import Hls from 'hls.js';
 // Keep the verified app.js fix on a fresh commit so CI can run again.
-import { LyricPlayer } from '@applemusic-like-lyrics/core';
-import '@applemusic-like-lyrics/core/style.css';
+import { SpicyLyricsRenderer } from './renderer/spicy/SpicyLyricsRenderer.ts';
 
 const $ = id => document.getElementById(id);
 let poller = null;
@@ -11,7 +10,7 @@ let currentAppleTrack = null;
 let lyricRequestId = 0;
 let lyricLines = [];
 let lyricsAreSynced = false;
-let amllPlayer = new LyricPlayer();
+let amllPlayer = new SpicyLyricsRenderer();
 let lastFrameTime = null;
 const lyricHost = $('lyrics');
 lyricHost.appendChild(amllPlayer.getElement());
