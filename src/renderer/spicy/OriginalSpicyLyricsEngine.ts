@@ -1,0 +1,94 @@
+import { setPageContainer } from "../components/Pages/PageView.ts";
+import { $lyricsContainerExists, $currentLyricsType } from "../utils/stores.ts";
+import { SpotifyPlayer } from "../components/Global/SpotifyPlayer.ts";
+import { LyricsObject } from "../utils/Lyrics/lyrics.ts";
+import { ApplySyllableLyrics } from "../utils/Lyrics/Applyer/Synced/Syllable.ts";
+import { ApplyLineLyrics } from "../utils/Lyrics/Applyer/Synced/Line.ts";
+import { ApplyStaticLyrics } from "../utils/Lyrics/Applyer/Static.ts";
+import { Lyrics } from "../utils/Lyrics/Animator/Main.ts";
+
+type AnyRecord = Record<string, any>;
+
+function createHost(host: HTMLElement) {
+  host.replaceChildren();
+  const page = document.createElement("div");
+  page.className = "SpicyLyricsPage";
+  const container = document.createElement("div");
+  container.className = "LyricsContainer";
+  const content = document.createElement("div");
+  content.className = "LyricsContent";
+  container.append(content);
+  page.append(container);
+  host.append(page);
+  setPageContainer(page);
+  $lyricsContainerExists.set(true);
+  return page;
+}
+
+/** Adapts the Spicy Lyrics API's native payload directly to its original applyers. */
+export class OriginalSpicyLyricsEngine {
+  private host: HTMLElement;
+  private page: HTMLElement;
+  private playing = false;
+
+  constructor(host: HTMLElement) {
+    this.host = host;
+    this.page = createHost(host);
+  }
+
+  setPlaying(playing: boolean) {
+    this.playing = playing;
+  }
+
+  setPosition(milliseconds: number) {
+    SpotifyPlayer.SetPosition(milliseconds);
+    Lyrics.TimeSetter(milliseconds);
+    if (this.playing) Lyrics.Animate(milliseconds);
+  }
+
+  clear() {
+    this.host.replaceChildren();
+    LyricsObject.Types.Syllable.Lines = [];
+    LyricsObject.Types.Line.Lines = [];
+    LyricsObject.Types.Static.Lines = [];
+  }
+
+  apply(payload: AnyRecord) {
+    const body: AnyRecord = payload?.spicyLyrics ?? payload ?? {};
+    const type = String(body.Type ?? "Static");
+    const content: AnyRecord[] = Array.isArray(body.Content) ? body.Content : [];
+
+    this.clear();
+    this.page = createHost(this.host);
+
+    if (type === "Syllable") {
+      const valid = content.filter(line =>
+        line?.Lead && Array.isArray(line.Lead.Syllables)
+      );
+      if (!valid.length) return false;
+      $currentLyricsType.set("Syllable");
+      ApplySyllableLyrics({ ...body, Type: type, Content: valid });
+      return true;
+    }
+
+    if (type === "Line") {
+      const valid = content.filter(line =>
+        typeof line?.Text === "string" &&
+        Number.isFinite(line.StartTime) &&
+        Number.isFinite(line.EndTime)
+      );
+      if (!valid.length) return false;
+      $currentLyricsType.set("Line");
+      ApplyLineLyrics({ ...body, Type: type, Content: valid });
+      return true;
+    }
+
+    const lines = Array.isArray(body.Lines)
+      ? body.Lines
+      : content.map(line => ({ Text: line?.Lead?.Text ?? "" }));
+    if (!lines.length) return false;
+    $currentLyricsType.set("Static");
+    ApplyStaticLyrics({ ...body, Type: "Static", Lines: lines });
+    return true;
+  }
+}
