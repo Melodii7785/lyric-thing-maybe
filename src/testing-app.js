@@ -17,6 +17,7 @@ let originalSpicyEngine = new OriginalSpicyLyricsEngine($('lyrics'));
 let lastFrameTime = null;
 const lyricHost = $('lyrics');
 lyricHost.appendChild(amllPlayer.getElement());
+amllPlayer.getElement().hidden = true;
 amllPlayer.setOptimizeOptions({
   normalizeSpaces: false,
   resetLineTimestamps: false,
@@ -393,6 +394,7 @@ async function api(path, options={}) {
 function clearTrack(){ $('track').hidden=true; $('nowbar').hidden=true; $('cover').style.display='none'; }
 function clearLyrics(){
   lyricLines=[];
+  amllPlayer.getElement().hidden = true;
   originalSpicyEngine.clear();
   if(amllPlayer){
     amllPlayer.setLyricLines([]);
@@ -622,6 +624,7 @@ function renderLyrics(data){
   loadIntoAMLL();
 }
 function loadIntoAMLL(){
+  amllPlayer.getElement().hidden = false;
   const amllLines=lyricLines.map((line,index)=>{
     const nextLineTime=lyricLines[index+1]?.time;
     const lineStart=Math.round((line.time||0)*1000);
