@@ -30,6 +30,7 @@ export class SpicyLyricsRenderer {
   private playing = false;
   private lastFrame = 0;
   private raf = 0;
+  private activeRow: HTMLElement | null = null;
 
   constructor() {
     this.root.className = "spicy-lyrics-renderer";
@@ -91,13 +92,16 @@ export class SpicyLyricsRenderer {
       const progress = Math.max(0, Math.min(1, (this.currentTime - word.start) / (word.end - word.start)));
       word.spring.SetGoal(progress);
     }
-    if (active) {
+    if (active && active !== this.activeRow) {
+      this.activeRow = active;
       const rootRect = this.root.getBoundingClientRect();
       const rowRect = active.getBoundingClientRect();
       const target = active.offsetTop - this.root.clientHeight * 0.42;
       if (rowRect.top < rootRect.top + 24 || rowRect.bottom > rootRect.bottom - 24) {
         this.root.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
       }
+    } else if (!active) {
+      this.activeRow = null;
     }
   }
   private frame = (now: number): void => {
@@ -116,5 +120,6 @@ export class SpicyLyricsRenderer {
     this.root.replaceChildren();
     this.words = [];
     this.lines = [];
+    this.activeRow = null;
   }
 }
