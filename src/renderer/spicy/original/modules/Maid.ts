@@ -1,0 +1,1 @@
+export class Maid { private cleanups: Array<() => void> = []; Give(cleanup: () => void) { this.cleanups.push(cleanup); } Destroy() { for (const cleanup of this.cleanups.splice(0).reverse()) cleanup(); } }
