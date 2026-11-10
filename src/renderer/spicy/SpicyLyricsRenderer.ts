@@ -73,8 +73,7 @@ export class SpicyLyricsRenderer {
   }
   pause(): void { this.playing = false; }
   resume(): void { this.playing = true; }
-  update(delta: number): void {
-    if (this.playing && Number.isFinite(delta)) this.currentTime += delta;
+  update(_delta: number): void {
     this.updateActiveLine();
   }
   private updateActiveLine(): void {
