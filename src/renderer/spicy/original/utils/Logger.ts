@@ -1,6 +1,6 @@
 export default class Logger {
   constructor(private name: string) {}
-  isEnabled() { return true; }
+  get isEnabled() { return true; }
   log(...args: unknown[]) { console.log("[", this.name, "]", ...args); }
   info(...args: unknown[]) { console.info("[", this.name, "]", ...args); }
   debug(...args: unknown[]) { console.debug("[", this.name, "]", ...args); }
