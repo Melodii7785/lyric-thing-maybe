@@ -1,4 +1,4 @@
-import { $lyricsContainerExists } from "../../../stores.ts";
+import { $lyricsContainerExists } from "../../stores.ts";
 import { PageContainer } from "../../../components/Pages/PageView.ts";
 import { type StyleProperties, applyStyles, removeAllStyles } from "../../CSS/Styles.ts";
 import {
