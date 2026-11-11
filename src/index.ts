@@ -658,7 +658,16 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try { return await handle(request, env); }
     catch (error) {
-      console.error("Unhandled request error", error instanceof Error ? error.message : "unknown");
+      const path = new URL(request.url).pathname;
+      const diagnostic = {
+        path,
+        method: request.method,
+        name: error instanceof Error ? error.name : "UnknownError",
+        // Error messages are capped and request query parameters are never logged.
+        message: error instanceof Error ? error.message.slice(0, 240) : "Unknown error",
+      };
+      console.error("Unhandled request error", diagnostic);
+      // Keep the public response generic; detailed diagnostics stay in Cloudflare Issues.
       return json({ error: "internal_error" }, 500);
     }
   },
