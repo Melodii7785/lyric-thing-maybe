@@ -176,6 +176,19 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
   #lyrics{height:55vh;max-height:65vh}
 }
 @media(prefers-reduced-motion:reduce){button{transition:none}}
+
+/* Diagnostics doctor button + report popup */
+#doctor-button{position:fixed;top:12px;right:12px;z-index:10000;width:auto;min-height:38px;padding:7px 11px;border:1px solid #666;background:#202020;color:#eee;font-size:.78rem;font-weight:750;box-shadow:0 3px 16px #0008}
+#doctor-backdrop{position:fixed;inset:0;z-index:10001;background:#000b;display:none;align-items:center;justify-content:center;padding:16px}
+#doctor-backdrop.open{display:flex}
+#doctor-dialog{width:min(720px,100%);max-height:85vh;overflow:auto;background:#171717;border:1px solid #555;padding:18px;color:#eee;box-shadow:0 12px 50px #000b}
+#doctor-dialog h2{margin:0 0 8px;font-size:1.25rem}
+#doctor-dialog p{color:#aaa;font-size:.85rem}
+#doctor-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+#doctor-report{white-space:pre-wrap;overflow-wrap:anywhere;background:#090909;border:1px solid #444;padding:12px;font:12px/1.5 ui-monospace,monospace;color:#d8e6d8;max-height:48vh;overflow:auto}
+#doctor-close{float:right;background:transparent;border-color:#666}
+@media(max-width:600px){#doctor-button{top:8px;right:8px;font-size:.7rem;min-height:34px;padding:5px 8px}#doctor-dialog{padding:14px}}
+
 </style>
 </head>
 <body>
@@ -242,6 +255,81 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
   </div>
 </section>
 <p class="muted">made with AMLL + Spicy Lyrics + questionable amounts of hope. lyrics may be synced, unsynced, or simply not here. technology!!</p>
+
+<button id="doctor-button" type="button">yes i am a doctor show me the reports</button>
+<div id="doctor-backdrop" role="dialog" aria-modal="true" aria-labelledby="doctor-title">
+  <section id="doctor-dialog">
+    <button id="doctor-close" type="button" class="secondary">close ×</button>
+    <h2 id="doctor-title">le diagnostics department</h2>
+    <p>the website's own report. no F12 required. console messages are captured while this page is open.</p>
+    <div id="doctor-actions"><button id="doctor-refresh" type="button">run diagnostics again</button><button id="doctor-copy" type="button" class="secondary">copy report</button></div>
+    <pre id="doctor-report">diagnostics initializing…</pre>
+  </section>
+</div>
+<script>
+(()=>{
+  const logs=[];
+  const maxLogs=120;
+  const add=(level,args)=>{
+    const message=Array.from(args).map(value=>{
+      if(value instanceof Error) return value.stack||value.message;
+      if(typeof value==='string') return value;
+      try{return JSON.stringify(value)}catch{return String(value)}
+    }).join(' ');
+    logs.push({level,message,time:new Date().toLocaleTimeString()});
+    if(logs.length>maxLogs) logs.shift();
+  };
+  ['log','info','warn','error','debug'].forEach(level=>{
+    const original=console[level]?.bind(console);
+    console[level]=(...args)=>{add(level,args);original?.(...args)};
+  });
+  window.addEventListener('error',event=>add('window error',[event.message,event.filename+':'+event.lineno+':'+event.colno]));
+  window.addEventListener('unhandledrejection',event=>add('unhandled rejection',[event.reason]));
+  const $=id=>document.getElementById(id);
+  const report=()=>{
+    const page=document.querySelector('#SpicyLyricsPage.SpicyRenderer');
+    const amll=document.querySelector('#lyrics .amll-lyric-player');
+    const originalLines=page?.querySelectorAll('.LyricsContent .line').length||0;
+    const amllLines=amll?.querySelectorAll('*').length||0;
+    const css=[...document.styleSheets].map(sheet=>sheet.href||'[bundled/inline stylesheet]');
+    const checks=[
+      'URL: '+location.href,
+      'Time: '+new Date().toISOString(),
+      '',
+      'RENDERER DOM',
+      'Original #SpicyLyricsPage: '+(page?'PRESENT':'NOT FOUND'),
+      'Original lyric line elements: '+originalLines,
+      'Original scroll containers: '+(page?.querySelectorAll('.SpicyLyricsScrollContainer').length||0),
+      'AMLL player element: '+(amll?'PRESENT':'NOT FOUND'),
+      'AMLL child elements: '+amllLines,
+      'AMLL element hidden: '+(amll?String(amll.hidden):'n/a'),
+      '',
+      'STYLESHEETS',
+      ...(css.length?css:['No stylesheet elements found']),
+      '',
+      'LYRICS PANEL',
+      'Panel visible: '+String(!$('lyrics-panel')?.hidden),
+      'Lyrics metadata: '+($('lyrics-meta')?.textContent||'(empty)').trim(),
+      'Attribution: '+($('lyrics-attribution')?.textContent||'(empty)').trim(),
+      '',
+      'RECENT CONSOLE / RUNTIME MESSAGES ('+logs.length+')',
+      ...(logs.length?logs.slice(-60).map(x=>'['+x.time+'] '+x.level.toUpperCase()+': '+x.message):['No captured messages yet.'])
+    ];
+    $('doctor-report').textContent=checks.join('\n');
+    return checks.join('\n');
+  };
+  $('doctor-button').addEventListener('click',()=>{$('doctor-backdrop').classList.add('open');report()});
+  $('doctor-close').addEventListener('click',()=>$('doctor-backdrop').classList.remove('open'));
+  $('doctor-backdrop').addEventListener('click',event=>{if(event.target===$('doctor-backdrop'))$('doctor-backdrop').classList.remove('open')});
+  $('doctor-refresh').addEventListener('click',report);
+  $('doctor-copy').addEventListener('click',async()=>{
+    try{await navigator.clipboard.writeText(report());$('doctor-copy').textContent='copied!!'}
+    catch{$('doctor-copy').textContent='copy unavailable — select the report text'}
+  });
+  document.addEventListener('keydown',event=>{if(event.key==='Escape')$('doctor-backdrop').classList.remove('open')});
+})();
+</script>
+
 <script type="module" src="/app.js"></script>
 </body>
 </html>
