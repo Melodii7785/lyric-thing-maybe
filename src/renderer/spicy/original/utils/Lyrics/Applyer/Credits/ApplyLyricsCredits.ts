@@ -1,2 +1,2 @@
-export function ApplySongCredits(_data: unknown) {}
-export function MarkLastLineSide(_data?: unknown) {}
+export function ApplySongCredits(..._args: unknown[]) {}
+export function MarkLastLineSide(..._args: unknown[]) {}
