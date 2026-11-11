@@ -59,7 +59,7 @@ export class OriginalSpicyLyricsEngine {
       );
       if (!valid.length) return false;
       $currentLyricsType.set("Syllable");
-      ApplySyllableLyrics({ ...body, Type: type, Content: valid as any });
+      ApplySyllableLyrics({ ...body, Type: type, StartTime: Number(body.StartTime ?? 0), Content: valid as any });
       return true;
     }
 
@@ -71,7 +71,7 @@ export class OriginalSpicyLyricsEngine {
       );
       if (!valid.length) return false;
       $currentLyricsType.set("Line");
-      ApplyLineLyrics({ ...body, Type: type, Content: valid });
+      ApplyLineLyrics({ ...body, Type: type, Content: valid as any });
       return true;
     }
 
