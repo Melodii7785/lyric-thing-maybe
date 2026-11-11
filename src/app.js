@@ -3,6 +3,8 @@ import Hls from 'hls.js';
 // Keep the verified app.js fix on a fresh commit so CI can run again.
 import { LyricPlayer } from '@applemusic-like-lyrics/core';
 import '@applemusic-like-lyrics/core/style.css';
+import { OriginalSpicyLyricsEngine } from './renderer/spicy/OriginalSpicyLyricsEngine.ts';
+import './renderer/spicy/original/css/Lyrics/Mixed.css';
 
 const $ = id => document.getElementById(id);
 let poller = null;
@@ -12,9 +14,13 @@ let lyricRequestId = 0;
 let lyricLines = [];
 let lyricsAreSynced = false;
 let amllPlayer = new LyricPlayer();
+let originalSpicyEngine = null;
+let currentSpicyLyricsData = null;
+let lyricRendererMode = 'amll';
 let lastFrameTime = null;
 const lyricHost = $('lyrics');
 lyricHost.appendChild(amllPlayer.getElement());
+originalSpicyEngine = new OriginalSpicyLyricsEngine(lyricHost);
 amllPlayer.setOptimizeOptions({
   normalizeSpaces: false,
   resetLineTimestamps: false,
@@ -391,6 +397,10 @@ async function api(path, options={}) {
 function clearTrack(){ $('track').hidden=true; $('nowbar').hidden=true; $('cover').style.display='none'; }
 function clearLyrics(){
   lyricLines=[];
+  originalSpicyEngine?.clear();
+  const originalPage=lyricHost.querySelector('.SpicyLyricsPage');
+  if(originalPage) originalPage.style.display='none';
+  amllPlayer.getElement().style.display='';
   if(amllPlayer){
     amllPlayer.setLyricLines([]);
     amllPlayer.setCurrentTime(0, true);
@@ -468,6 +478,7 @@ function spicyVocalWords(vocal, fallbackTime=0){
   return {time:time??0,text,words:syllables};
 }
 function renderSpicyLyrics(data){
+  currentSpicyLyricsData=data;
   clearLyrics();
   $('lyrics-panel').hidden=false;
   const body=data.spicyLyrics||{};
@@ -501,7 +512,48 @@ function renderSpicyLyrics(data){
     : body.Type==='Line'
       ? 'i guess this works idk. its like spotify but best we got for this song'
       : 'vat ze fuck is zhis bro. regular lyriks? i asked for ze FANCI lyriks';
-  loadIntoAMLL();
+  renderSpicyLyricsWithSelectedRenderer();
+}
+function updateRendererToggle(){
+  const button=$('renderer-toggle-button');
+  if(!button) return;
+  button.disabled=!currentSpicyLyricsData;
+  button.textContent=lyricRendererMode==='amll'
+    ? "okay let's try ✨ le port ✨"
+    : "port's broken we're AMLLing this bitch";
+  button.setAttribute('aria-label',button.textContent);
+  button.title=currentSpicyLyricsData?'Switch renderer for the current Spicy Lyrics response':'Find Spicy Lyrics first to switch renderers';
+}
+function renderSpicyLyricsWithSelectedRenderer(){
+  if(!currentSpicyLyricsData) return;
+  originalSpicyEngine?.clear();
+  const originalPage=lyricHost.querySelector('.SpicyLyricsPage');
+  if(originalPage) originalPage.style.display='none';
+  amllPlayer.setLyricLines([]);
+  amllPlayer.setCurrentTime(0,true);
+  const amllElement=amllPlayer.getElement();
+  if(lyricRendererMode==='port'){
+    amllElement.style.display='none';
+    try{
+      const applied=originalSpicyEngine.apply(currentSpicyLyricsData.spicyLyrics||currentSpicyLyricsData);
+      const page=lyricHost.querySelector('.SpicyLyricsPage');
+      if(!applied || !page) throw new Error('Original Spicy renderer did not create lyric content.');
+      page.style.display='';
+      originalSpicyEngine.setPosition(Math.round(currentPlaybackSeconds()*1000));
+      $('lyrics-meta').textContent+=' · rendered by ✨ le port ✨';
+    }catch(error){
+      console.error('[Original Spicy renderer failed]',error);
+      $('lyrics-meta').textContent='le port did not worky: '+(error?.message||String(error))+' · switch back to AMLL';
+      amllElement.style.display='';
+      lyricRendererMode='amll';
+      loadIntoAMLL();
+    }
+  }else{
+    amllElement.style.display='';
+    loadIntoAMLL();
+    $('lyrics-meta').textContent+=' · rendered by AMLL';
+  }
+  updateRendererToggle();
 }
 function timeSeconds(value){
   if(!value) return null;
@@ -605,6 +657,8 @@ function renderLyrics(data){
   clearLyrics();
   $('lyrics-panel').hidden=false;
   setAttribution('lrc.red');
+  currentSpicyLyricsData=null;
+  updateRendererToggle();
   lyricLines=parseTtml(data.ttml||'');
   lyricsAreSynced=lyricLines.some(line=>line.words.some(word=>word.time!==null));
   if(!lyricLines.length){
@@ -894,6 +948,12 @@ function stopPolling(){
   if(poller) clearInterval(poller);
   poller=null;
 }
+$('renderer-toggle-button').addEventListener('click',()=>{
+  if(!currentSpicyLyricsData) return;
+  lyricRendererMode=lyricRendererMode==='amll'?'port':'amll';
+  renderSpicyLyricsWithSelectedRenderer();
+});
+updateRendererToggle();
 $('connect').onclick=()=>location.href='/auth/login';
 $('check').onclick=playback;
 $('refresh-devices').onclick=loadDevices;
@@ -925,6 +985,9 @@ $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{me
 function animateAMLL(frameTime){
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
   lastFrameTime=frameTime;
+  if(lyricRendererMode==='port' && originalSpicyEngine){
+    originalSpicyEngine.setPosition(Math.round(currentPlaybackSeconds()*1000));
+  }
   if(amllPlayer){
     amllPlayer.setCurrentTime(Math.round(currentPlaybackSeconds()*1000));
     renderProgress();
