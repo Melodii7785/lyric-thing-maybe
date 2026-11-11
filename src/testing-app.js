@@ -932,7 +932,6 @@ $('refresh-fancy-background').onclick=async()=>{
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('okay bye Spotify. see you later i guess.')}catch(e){say('Spotify would not let me leave. '+e.message)}};
 function animateAMLL(frameTime){
   originalSpicyEngine.setPosition(Math.round(currentPlaybackSeconds()*1000));
-  originalSpicyEngine.setPlaying(isPlaying);
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
   lastFrameTime=frameTime;
   if(amllPlayer){
