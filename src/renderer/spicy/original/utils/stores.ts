@@ -17,8 +17,22 @@ export function atom<T>(initial: T) {
 export const $lyricsContainerExists = atom(true);
 export const $minimalLyricsMode = atom(false);
 export const $simpleLyricsMode = atom(false);
-export const $currentLyricsType = atom<"Syllable" | "Line" | "Static">("Syllable");
+export const $currentLyricsType = atom<"Syllable" | "Line" | "Static" | "None">("None");
 export const $joinSplitWords = atom(false);
 export const $smoothScrolling = atom(true);
-export const $experiment = atom<Record<string, boolean>>({});
+export const $experiment = Object.assign(
+  atom<Record<string, boolean>>({}),
+  { select(name: string) { return atomSelector(this, name); } }
+);
+function atomSelector(store: ReturnType<typeof atom<Record<string, boolean>>>, name: string) {
+  const selected = (() => store.get()[name] === true) as (() => boolean) & {
+    get: () => boolean;
+    set: (next: boolean) => void;
+    listen: (listener: (value: boolean) => void) => () => void;
+  };
+  selected.get = selected;
+  selected.set = (next) => store.set({ ...store.get(), [name]: next });
+  selected.listen = (listener) => store.listen(value => listener(value[name] === true));
+  return selected;
+}
 export const $seekFadeCompensation = atom(false);
