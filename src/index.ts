@@ -166,7 +166,24 @@ async function handle(request: Request, env: Env): Promise<Response> {
       },
       body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: env.SPOTIFY_REDIRECT_URI }),
     });
-    if (!tokenResponse.ok) return Response.redirect(appUrl(env) + "?spotify_error=token_exchange_failed", 302);
+    if (!tokenResponse.ok) {
+      let upstreamError: { error?: string; error_description?: string } = {};
+      try { upstreamError = await tokenResponse.json() as typeof upstreamError; } catch { /* ignore non-JSON responses */ }
+      // Log only Spotify's non-secret error code and HTTP status. Never log the
+      // authorization code, client secret, tokens, or the full response body.
+      console.warn("Spotify token exchange failed", {
+        status: tokenResponse.status,
+        error: upstreamError.error || "unknown",
+        hasClientId: !!env.CLIENT_ID,
+        hasClientSecret: !!env.CLIENT_SECRET,
+        hasRedirectUri: !!env.SPOTIFY_REDIRECT_URI,
+      });
+      const failure = new URL(appUrl(env));
+      failure.searchParams.set("spotify_error", "token_exchange_failed");
+      failure.searchParams.set("spotify_reason", upstreamError.error || "unknown");
+      failure.searchParams.set("spotify_status", String(tokenResponse.status));
+      return Response.redirect(failure.toString(), 302);
+    }
     const token = await tokenResponse.json() as TokenResponse;
     if (!token.refresh_token) return Response.redirect(appUrl(env) + "?spotify_error=missing_refresh_token", 302);
     const meResponse = await fetch(API_URL + "/me", { headers: { authorization: "Bearer " + token.access_token } });
