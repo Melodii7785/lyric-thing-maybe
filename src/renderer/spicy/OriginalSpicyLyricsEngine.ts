@@ -59,7 +59,7 @@ export class OriginalSpicyLyricsEngine {
       );
       if (!valid.length) return false;
       $currentLyricsType.set("Syllable");
-      ApplySyllableLyrics({ ...body, Type: type, Content: valid });
+      ApplySyllableLyrics({ ...body, Type: type, Content: valid as any });
       return true;
     }
 
