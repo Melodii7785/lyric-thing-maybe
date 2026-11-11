@@ -40,6 +40,11 @@
         "binding": "OAUTH_STATE",
         "id": "34f693f11325478f93282b4ee2d2234a"
       }
-    ]
+    ],
+    "vars": {
+      "APP_ORIGIN": "https://port-original-spicy-lyrics-engine-lyricthing.melodii7785.workers.dev",
+      "CLIENT_ID": "2298bfff363944bfa2b6818eb5f7a2cf",
+      "SPOTIFY_REDIRECT_URI": "https://port-original-spicy-lyrics-engine-lyricthing.melodii7785.workers.dev/auth/callback"
+    }
   }
 }
