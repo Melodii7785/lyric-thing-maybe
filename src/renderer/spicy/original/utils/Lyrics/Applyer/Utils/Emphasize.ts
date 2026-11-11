@@ -1,4 +1,4 @@
-import { $simpleLyricsMode } from "../../../../stores.ts";
+import { $simpleLyricsMode } from "../../../stores.ts";
 import { ArabicPersianRegex } from "../../../Addons.ts";
 import { IdleEmphasisLyricsScale } from "../../Animator/Shared.ts";
 import { ConvertTime } from "../../ConvertTime.ts";
@@ -111,7 +111,7 @@ export default function Emphasize(
   // Make sure CurrentLineLyricsObject is valid and Syllables.Lead exists
   if (
     CurrentLineLyricsObject >= 0 &&
-    LyricsObject.Types.Syllable.Lines?.[CurrentLineLyricsObject].Syllables
+    LyricsObject.Types.Syllable.Lines?.[CurrentLineLyricsObject]?.Syllables
   ) {
     LyricsObject.Types.Syllable.Lines[CurrentLineLyricsObject].Syllables.Lead.push({
       HTMLElement: word,
