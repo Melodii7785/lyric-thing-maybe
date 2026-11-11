@@ -13,7 +13,8 @@ type AnyRecord = Record<string, any>;
 function createHost(host: HTMLElement) {
   host.querySelector('.SpicyLyricsPage')?.remove();
   const page = document.createElement("div");
-  page.className = "SpicyLyricsPage";
+  page.id = "SpicyLyricsPage";
+  page.className = "SpicyLyricsPage SpicyRenderer";
   const container = document.createElement("div");
   container.className = "LyricsContainer";
   const content = document.createElement("div");
