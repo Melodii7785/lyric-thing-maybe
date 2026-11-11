@@ -20,19 +20,25 @@ export const $simpleLyricsMode = atom(false);
 export const $currentLyricsType = atom<"Syllable" | "Line" | "Static" | "None">("None");
 export const $joinSplitWords = atom(false);
 export const $smoothScrolling = atom(true);
-export const $experiment = Object.assign(
-  atom<Record<string, boolean>>({}),
-  { select(name: string) { return atomSelector(this, name); } }
-);
-function atomSelector(store: ReturnType<typeof atom<Record<string, boolean>>>, name: string) {
-  const selected = (() => store.get()[name] === true) as (() => boolean) & {
+const experimentState = atom<Record<string, boolean>>({});
+function atomSelector(name: string) {
+  const selected = (() => experimentState.get()[name] === true) as (() => boolean) & {
     get: () => boolean;
     set: (next: boolean) => void;
     listen: (listener: (value: boolean) => void) => () => void;
   };
   selected.get = selected;
-  selected.set = (next) => store.set({ ...store.get(), [name]: next });
-  selected.listen = (listener) => store.listen(value => listener(value[name] === true));
+  selected.set = (next) => experimentState.set({ ...experimentState.get(), [name]: next });
+  selected.listen = (listener) => experimentState.listen(value => listener(value[name] === true));
   return selected;
 }
+export const $experiment = Object.assign(
+  (name: string) => atomSelector(name),
+  {
+    get: experimentState.get,
+    set: experimentState.set,
+    listen: experimentState.listen,
+    subscribe: experimentState.subscribe,
+  }
+);
 export const $seekFadeCompensation = atom(false);
