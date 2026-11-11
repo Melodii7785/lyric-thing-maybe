@@ -478,15 +478,14 @@ function renderSpicyLyrics(data){
   const body=data.spicyLyrics||{};
   const content=Array.isArray(body.Content)?body.Content:[];
   lyricLines=content.flatMap(entry=>{
+    if(body.Type==='Line'){
+      const text=typeof entry?.Text==='string'?entry.Text:'';
+      return text.trim()? [{time:Number.isFinite(entry.StartTime)?entry.StartTime:0,text,words:[],isBG:false,isDuet:entry.OppositeAligned===true}]:[];
+    }
     const lead=spicyVocalWords(entry?.Lead,entry?.StartTime??body.StartTime??0);
     const lines=[];
-    // Spicy Lyrics marks opposite-side duet vocals explicitly. AMLL's
-    // isDuet flag applies the opposite/right-side lyric alignment.
     const oppositeAligned=entry?.OppositeAligned===true;
     if(lead.text.trim()) lines.push({...lead,isBG:false,isDuet:oppositeAligned});
-    // Spicy Lyrics exposes backing vocals as a separate Background[] array.
-    // Keep each backing part as its own AMLL line instead of flattening it
-    // into the lead vocal (which loses the background-vocal styling).
     const backgrounds=Array.isArray(entry?.Background)?entry.Background:[];
     for(const vocal of backgrounds){
       const background=spicyVocalWords(vocal,entry?.StartTime??lead.time);
@@ -495,9 +494,10 @@ function renderSpicyLyrics(data){
     return lines;
   }).sort((a,b)=>a.time-b.time);
   setAttribution(body.source,body.UploadAttribution);
-  if(!lyricLines.length){
-    $('lyrics-meta').textContent='Spicy Lyrics returned a response, but it contained no renderable lyric lines.';
-    amllPlayer.setLyricLines([]);
+  const applied = originalSpicyEngine.apply(body);
+  originalSpicyEngine.setPosition(Math.round(currentPlaybackSeconds()*1000));
+  if (!applied) {
+    $('lyrics-meta').textContent='the original Spicy Lyrics renderer could not apply this payload. check the response type and content.';
     return;
   }
   const hasSyllableTiming=lyricLines.some(line=>line.words.some(word=>word.time!==null&&word.endTime!==null));
@@ -505,10 +505,9 @@ function renderSpicyLyrics(data){
     ? 'we did it evergbkdy. the lyrics are SYLLABLE SYNCed. three cheers for tecknologi!!.'
     : body.Type==='Line'
       ? 'i guess this works idk. its like spotify but best we got for this song'
-      : 'vat ze fuck is zhis bro. regular lyriks? i asked for ze FANCI lyriks';
-  const applied = originalSpicyEngine.apply(body);
-  originalSpicyEngine.setPosition(Math.round(currentPlaybackSeconds()*1000));
-  if (!applied) $('lyrics-meta').textContent='the original Spicy Lyrics renderer could not apply this payload. check the response type and content.';
+      : body.Type==='Static'
+        ? 'vat ze fuck is zhis bro. regular lyriks? i asked for ze FANCI lyriks'
+        : 'Spicy Lyrics loaded. technology!!';
 }
 function timeSeconds(value){
   if(!value) return null;
