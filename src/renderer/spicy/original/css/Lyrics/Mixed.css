@@ -1295,3 +1295,24 @@
   scale: 1.05;
   backdrop-filter: blur(2px);
 }
+
+/* Standalone web host sizing: Spicetify normally supplies this variable.
+   The web port has no Spotify .Root container, so give synced lyrics a
+   readable viewport-relative size instead of letting the inherited value
+   resolve to zero / an unexpectedly tiny fallback. */
+#SpicyLyricsPage.SpicyRenderer {
+  --DefaultLyricsSize: clamp(1.35rem, 5.2vw, 2.8rem);
+}
+#SpicyLyricsPage.SpicyRenderer .LyricsContainer {
+  width: 100%;
+  height: 100%;
+}
+#SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent {
+  container-type: inline-size;
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+#SpicyLyricsPage.SpicyRenderer .LyricsContainer .SpicyLyricsScrollContainer {
+  --DefaultLyricsSize: clamp(1.35rem, 5.2vw, 2.8rem);
+}
