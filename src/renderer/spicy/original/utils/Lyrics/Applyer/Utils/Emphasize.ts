@@ -113,7 +113,7 @@ export default function Emphasize(
     CurrentLineLyricsObject >= 0 &&
     LyricsObject.Types.Syllable.Lines?.[CurrentLineLyricsObject]?.Syllables
   ) {
-    LyricsObject.Types.Syllable.Lines[CurrentLineLyricsObject].Syllables.Lead.push({
+    LyricsObject.Types.Syllable.Lines[CurrentLineLyricsObject]!.Syllables!.Lead.push({
       HTMLElement: word,
       StartTime: StartTime,
       EndTime: EndTime,
