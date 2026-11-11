@@ -2,6 +2,8 @@ import { setPageContainer } from "./original/components/Pages/PageView.ts";
 import { $lyricsContainerExists, $currentLyricsType } from "./original/utils/stores.ts";
 import { SpotifyPlayer } from "./original/components/Global/SpotifyPlayer.ts";
 import { LyricsObject } from "./original/utils/Lyrics/lyrics.ts";
+import { DestroyAllLyricsContainers } from "./original/utils/Lyrics/Applyer/CreateLyricsContainer.ts";
+import { ClearScrollSimplebar } from "./original/utils/Scrolling/Simplebar/ScrollSimplebar.ts";
 import { ApplySyllableLyrics } from "./original/utils/Lyrics/Applyer/Synced/Syllable.ts";
 import { ApplyLineLyrics } from "./original/utils/Lyrics/Applyer/Synced/Line.ts";
 import { ApplyStaticLyrics } from "./original/utils/Lyrics/Applyer/Static.ts";
@@ -39,6 +41,11 @@ export class OriginalSpicyLyricsEngine {
   }
 
   clear() {
+    $lyricsContainerExists.set(false);
+    DestroyAllLyricsContainers();
+    ClearScrollSimplebar();
+    setPageContainer(null);
+    $currentLyricsType.set("None");
     this.host.querySelector('.SpicyLyricsPage')?.remove();
     LyricsObject.Types.Syllable.Lines = [];
     LyricsObject.Types.Line.Lines = [];
@@ -77,7 +84,7 @@ export class OriginalSpicyLyricsEngine {
 
     const lines = Array.isArray(body.Lines)
       ? body.Lines
-      : content.map(line => ({ Text: line?.Lead?.Text ?? "" }));
+      : content.map(line => ({ Text: typeof line === "string" ? line : String(line?.Text ?? line?.Lead?.Text ?? ""), TransliteratedText: line?.TransliteratedText }));
     if (!lines.length) return false;
     $currentLyricsType.set("Static");
     ApplyStaticLyrics({ ...body, Type: "Static", Lines: lines });
