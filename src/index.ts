@@ -667,7 +667,17 @@ export default {
         message: error instanceof Error ? error.message.slice(0, 240) : "Unknown error",
       };
       console.error("Unhandled request error", diagnostic);
-      // Keep the public response generic; detailed diagnostics stay in Cloudflare Issues.
+      // Temporarily expose a bounded diagnostic only on the OAuth callback so
+      // callback failures can be debugged without relying on Observability.
+      if (path === "/auth/callback") {
+        return json({
+          error: "internal_error",
+          diagnostic: {
+            name: diagnostic.name,
+            message: diagnostic.message,
+          },
+        }, 500);
+      }
       return json({ error: "internal_error" }, 500);
     }
   },
