@@ -82,7 +82,7 @@ export class OriginalSpicyLyricsEngine {
       return true;
     }
 
-    const lines = Array.isArray(body.Lines)
+    const lines = Array.isArray(body.Lines) && body.Lines.length
       ? body.Lines
       : content.map(line => ({ Text: typeof line === "string" ? line : String(line?.Text ?? line?.Lead?.Text ?? ""), TransliteratedText: line?.TransliteratedText }));
     if (!lines.length) return false;
