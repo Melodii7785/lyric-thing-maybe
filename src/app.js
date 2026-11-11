@@ -5,6 +5,8 @@ import { LyricPlayer } from '@applemusic-like-lyrics/core';
 import '@applemusic-like-lyrics/core/style.css';
 import { OriginalSpicyLyricsEngine } from './renderer/spicy/OriginalSpicyLyricsEngine.ts';
 import './renderer/spicy/original/css/Lyrics/Mixed.css';
+import { Animate as animateOriginalSpicyLyrics } from './renderer/spicy/original/utils/Lyrics/Animator/Lyrics/LyricsAnimator.ts';
+import { TimeSetter as setOriginalSpicyLyricsTime } from './renderer/spicy/original/utils/Lyrics/Animator/Lyrics/LyricsSetter.ts';
 
 const $ = id => document.getElementById(id);
 let poller = null;
@@ -986,7 +988,10 @@ function animateAMLL(frameTime){
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
   lastFrameTime=frameTime;
   if(lyricRendererMode==='port' && originalSpicyEngine){
-    originalSpicyEngine.setPosition(Math.round(currentPlaybackSeconds()*1000));
+    const position=Math.round(currentPlaybackSeconds()*1000);
+    originalSpicyEngine.setPosition(position);
+    setOriginalSpicyLyricsTime(position);
+    animateOriginalSpicyLyrics(position);
   }
   if(amllPlayer){
     amllPlayer.setCurrentTime(Math.round(currentPlaybackSeconds()*1000));
