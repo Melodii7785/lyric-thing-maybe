@@ -7,6 +7,7 @@ import { OriginalSpicyLyricsEngine } from './renderer/spicy/OriginalSpicyLyricsE
 import './renderer/spicy/original/css/Lyrics/Mixed.css';
 import { Animate as animateOriginalSpicyLyrics } from './renderer/spicy/original/utils/Lyrics/Animator/Lyrics/LyricsAnimator.ts';
 import { TimeSetter as setOriginalSpicyLyricsTime } from './renderer/spicy/original/utils/Lyrics/Animator/Lyrics/LyricsSetter.ts';
+import { QueueForceScroll } from './renderer/spicy/original/utils/Scrolling/ScrollToActiveLine.ts';
 
 const $ = id => document.getElementById(id);
 let poller = null;
@@ -992,6 +993,7 @@ function animateAMLL(frameTime){
     originalSpicyEngine.setPosition(position);
     setOriginalSpicyLyricsTime(position);
     animateOriginalSpicyLyrics(position);
+    QueueForceScroll();
   }
   if(amllPlayer){
     amllPlayer.setCurrentTime(Math.round(currentPlaybackSeconds()*1000));
