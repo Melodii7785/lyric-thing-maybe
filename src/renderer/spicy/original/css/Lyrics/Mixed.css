@@ -1327,9 +1327,9 @@
   }
 }
 
-/* Restore the app's SF Pro Display typography for the original renderer. */
-#SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line:not(.bg-line),
-#SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line:not(.bg-line) *,
+/* Keep every lyric line, including background vocals, on the app's selected typeface. */
+#SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line,
+#SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line *,
 #SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .SongCredits {
   font-family: "SF Pro Display", "Roboto Flex", Arial, sans-serif !important;
   -webkit-font-smoothing: antialiased;
@@ -1365,14 +1365,14 @@
 .appearance-zoom{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:0 12px 12px}
 .appearance-zoom span{color:var(--muted);font-size:.82rem;margin-right:4px}
 .appearance-zoom button{min-height:36px;padding:6px 12px}
-#SpicyLyricsPage.SpicyRenderer[data-lyric-font="sf"] .LyricsContent .line:not(.bg-line),
-#SpicyLyricsPage.SpicyRenderer[data-lyric-font="sf"] .LyricsContent .line:not(.bg-line) * {font-family:"SF Pro Display","Roboto Flex",Arial,sans-serif!important}
-#SpicyLyricsPage.SpicyRenderer[data-lyric-font="roboto"] .LyricsContent .line:not(.bg-line),
-#SpicyLyricsPage.SpicyRenderer[data-lyric-font="roboto"] .LyricsContent .line:not(.bg-line) * {font-family:"Roboto Flex",Arial,sans-serif!important}
-#SpicyLyricsPage.SpicyRenderer[data-lyric-font="system"] .LyricsContent .line:not(.bg-line),
-#SpicyLyricsPage.SpicyRenderer[data-lyric-font="system"] .LyricsContent .line:not(.bg-line) * {font-family:system-ui,sans-serif!important}
-#SpicyLyricsPage.SpicyRenderer[data-lyric-font="arial"] .LyricsContent .line:not(.bg-line),
-#SpicyLyricsPage.SpicyRenderer[data-lyric-font="arial"] .LyricsContent .line:not(.bg-line) * {font-family:Arial,sans-serif!important}
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="sf"] .LyricsContent .line,
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="sf"] .LyricsContent .line * {font-family:"SF Pro Display","Roboto Flex",Arial,sans-serif!important}
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="roboto"] .LyricsContent .line,
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="roboto"] .LyricsContent .line * {font-family:"Roboto Flex",Arial,sans-serif!important}
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="system"] .LyricsContent .line,
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="system"] .LyricsContent .line * {font-family:system-ui,sans-serif!important}
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="arial"] .LyricsContent .line,
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="arial"] .LyricsContent .line * {font-family:Arial,sans-serif!important}
 #SpicyLyricsPage.SpicyRenderer.NoAnimations *,
 #SpicyLyricsPage.SpicyRenderer.NoAnimations *::before,
 #SpicyLyricsPage.SpicyRenderer.NoAnimations *::after {animation:none!important;transition:none!important;scroll-behavior:auto!important}
