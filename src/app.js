@@ -45,7 +45,7 @@ function applyLyricsZoom(){
 }
 
 const APPEARANCE_KEY = 'lyricthing.originalAppearance';
-const APPEARANCE_DEFAULTS = { font: 'sf', simple: false, blur: true, animations: true, seekFadeCompensation: true, joinSplitWords: false, smoothScrolling: true, highlightOnHover: true, duetLinePadding: false };
+const APPEARANCE_DEFAULTS = { font: 'sf', simple: false, blur: true, animations: true, seekFadeCompensation: true, joinSplitWords: false, smoothScrolling: true, highlightOnHover: true, duetLinePadding: false, creditsFollowLastSinger: false };
 function readAppearance(){
   try { return { ...APPEARANCE_DEFAULTS, ...JSON.parse(localStorage.getItem(APPEARANCE_KEY)||'{}') }; }
   catch { return { ...APPEARANCE_DEFAULTS }; }
@@ -59,6 +59,7 @@ function applyOriginalAppearance(){
   page.classList.toggle('NoAnimations', !appearance.animations);
   page.classList.toggle('NoLineHoverBackground', !appearance.highlightOnHover);
   page.classList.toggle('DuetLinePadding', appearance.duetLinePadding);
+  page.classList.toggle('CreditsFollowLastLine', appearance.creditsFollowLastSinger);
   page.querySelector('.LyricsContent')?.classList.toggle('HideLineBlur', !appearance.blur);
   $simpleLyricsMode.set(appearance.simple);
 }
@@ -72,6 +73,7 @@ function syncAppearanceControls(){
   $('appearance-smooth-scroll').checked = appearance.smoothScrolling;
   $('appearance-hover-highlight').checked = appearance.highlightOnHover;
   $('appearance-duet-padding').checked = appearance.duetLinePadding;
+  $('appearance-credits-follow-singer').checked = appearance.creditsFollowLastSinger;
 }
 function saveAppearance(){
   try { localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearance)); }
@@ -576,7 +578,7 @@ function renderSpicyLyrics(data){
     }
     return lines;
   }).sort((a,b)=>a.time-b.time);
-  setAttribution(body.source,body.UploadAttribution);
+  $('lyrics-attribution').replaceChildren();
   if(!lyricLines.length){
     $('lyrics-meta').textContent='Spicy Lyrics returned a response, but it contained no renderable lyric lines.';
     amllPlayer.setLyricLines([]);
@@ -1246,6 +1248,7 @@ $('appearance-join-words').addEventListener('change',()=>{appearance.joinSplitWo
 $('appearance-smooth-scroll').addEventListener('change',()=>{appearance.smoothScrolling=$('appearance-smooth-scroll').checked;$smoothScrolling.set(appearance.smoothScrolling);saveAppearance();});
 $('appearance-hover-highlight').addEventListener('change',()=>{appearance.highlightOnHover=$('appearance-hover-highlight').checked;saveAppearance();});
 $('appearance-duet-padding').addEventListener('change',()=>{appearance.duetLinePadding=$('appearance-duet-padding').checked;saveAppearance();});
+$('appearance-credits-follow-singer').addEventListener('change',()=>{appearance.creditsFollowLastSinger=$('appearance-credits-follow-singer').checked;saveAppearance();});
 $joinSplitWords.set(appearance.joinSplitWords);
 $smoothScrolling.set(appearance.smoothScrolling);
 syncAppearanceControls();
