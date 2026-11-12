@@ -570,6 +570,11 @@ function renderSpicyLyricsWithSelectedRenderer(){
       const page=lyricHost.querySelector('.SpicyLyricsPage');
       if(!applied || !page) throw new Error('Original Spicy renderer did not create lyric content.');
       page.style.display='';
+      // A newly-created Spicy Lyrics page has no zoom property yet.
+      // Re-read the user's saved preference and apply it to every new track.
+      lyricsZoom=readLyricsZoom();
+      savedLyricsZoom=lyricsZoom;
+      applyLyricsZoom();
       originalSpicyEngine.setPosition(Math.round(currentPlaybackSeconds()*1000));
       $('lyrics-meta').textContent+=' · rendered by ✨ le port ✨';
     }catch(error){
