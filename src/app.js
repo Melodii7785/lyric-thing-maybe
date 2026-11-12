@@ -638,7 +638,9 @@ function parseTtml(value){
   const xml=new DOMParser().parseFromString(value,'application/xml');
   if(xml.querySelector('parsererror')) throw new Error('invalid_ttml');
   const ttmNamespace='http://www.w3.org/ns/ttml#metadata';
+  const lrcNamespace='http://lrc.red/lyric-ttml-internal';
   const xmlNamespace='http://www.w3.org/XML/1998/namespace';
+  const absoluteWordTiming=xml.documentElement.getAttributeNS(lrcNamespace,'timing')==='Word';
   const agentIds=Array.from(xml.getElementsByTagNameNS(ttmNamespace,'agent'))
     .map(agent=>agent.getAttributeNS(xmlNamespace,'id')||agent.getAttribute('xml:id'))
     .filter(Boolean);
@@ -654,7 +656,13 @@ function parseTtml(value){
     const words=[];
     for(const node of nodes){
       if(node.nodeType===Node.TEXT_NODE){
-        if(node.textContent) words.push({text:node.textContent,time:null,endTime:null});
+        const text=node.textContent||'';
+        if(/^\\s+$/.test(text)&&words.length){
+          // Keep inter-word spaces attached to the preceding timed syllable.
+          words[words.length-1].text+=text;
+        }else if(text){
+          words.push({text,time:null,endTime:null});
+        }
         continue;
       }
       if(node.nodeType!==Node.ELEMENT_NODE) continue;
@@ -671,17 +679,27 @@ function parseTtml(value){
           words.push(...parseWords(nested,elementStart,hasSpanTiming));
         }else{
           const text=element.textContent||'';
-          if(text) words.push({
-            text,
-            time:localBegin!==null||inheritedSpanTiming?elementStart:null,
-            endTime:localEnd!==null?parentOffset+localEnd:null
-          });
+          if(text){
+            const partOfWord=words.length>0 && words[words.length-1].isPartOfWord===true;
+            if(words.length && words[words.length-1]._adjacentSpan===true){
+              words[words.length-1].isPartOfWord=true;
+            }
+            words.push({
+              text,
+              time:localBegin!==null||inheritedSpanTiming?elementStart:null,
+              endTime:localEnd!==null?parentOffset+localEnd:null,
+              isPartOfWord:partOfWord,
+              _adjacentSpan:true
+            });
+          }
         }
       }else{
+        // A structural element breaks adjacency between separate lyric spans.
+        if(words.length) words[words.length-1]._adjacentSpan=false;
         words.push(...parseWords(Array.from(element.childNodes),elementStart,hasSpanTiming));
       }
     }
-    return words.filter(word=>word.text);
+    return words.filter(word=>word.text).map(({_adjacentSpan,...word})=>word);
   };
   const parseBackgroundWords=(element,parentOffset=0)=>{
     const words=[];
@@ -726,7 +744,9 @@ function parseTtml(value){
     const agent=p.getAttributeNS(ttmNamespace,'agent')||p.getAttribute('ttm:agent')||null;
     const isDuet=hasMultipleSingers && !!agent && agent!==firstAgent;
     const directChildren=Array.from(p.childNodes);
-    const mainWords=parseWords(directChildren,lineTime);
+    // lrc.red Word TTML timestamps are absolute song times, not offsets
+    // relative to the enclosing <p> or <div>.
+    const mainWords=parseWords(directChildren,absoluteWordTiming?0:lineTime);
     const mainText=mainWords.map(word=>word.text).join('').trim();
     if(mainText){
       parsed.push({time:lineTime,endTime:lineEnd,text:mainText,words:mainWords,isBG:false,isDuet});
@@ -741,7 +761,7 @@ function parseTtml(value){
     };
     collectBackgrounds(p);
     for(const background of backgrounds){
-      const words=parseBackgroundWords(background,lineTime);
+      const words=parseBackgroundWords(background,absoluteWordTiming?0:lineTime);
       const text=words.map(word=>word.text).join('').trim();
       if(!text) continue;
       const bgTime=words.find(word=>word.time!==null)?.time??lineTime;
