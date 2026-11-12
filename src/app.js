@@ -646,7 +646,9 @@ function parseTtml(value){
   const hasMultipleSingers=distinctAgents.length>1;
   const firstAgent=distinctAgents[0]||agentIds[0]||null;
   const getRole=element=>element.getAttributeNS(ttmNamespace,'role')||element.getAttribute('ttm:role')||'';
-  const parseWords=nodes=>{
+  // TTML begin/end values on nested elements are relative to their parent.
+  // Accumulate those offsets instead of treating every span timestamp as song time.
+  const parseWords=(nodes,parentOffset=0,inheritedSpanTiming=false)=>{
     const words=[];
     for(const node of nodes){
       if(node.nodeType===Node.TEXT_NODE){
@@ -656,48 +658,68 @@ function parseTtml(value){
       if(node.nodeType!==Node.ELEMENT_NODE) continue;
       const element=node;
       if(getRole(element)) continue;
+      const localBegin=timeSeconds(element.getAttribute('begin'));
+      const localEnd=timeSeconds(element.getAttribute('end'));
+      const elementStart=parentOffset+(localBegin??0);
+      const hasSpanTiming=inheritedSpanTiming||localBegin!==null;
       if(element.localName==='span'){
         const nested=Array.from(element.childNodes).filter(child=>
           !(child.nodeType===Node.ELEMENT_NODE && getRole(child)==='x-bg'));
         if(nested.some(child=>child.nodeType===Node.ELEMENT_NODE)){
-          words.push(...parseWords(nested));
+          words.push(...parseWords(nested,elementStart,hasSpanTiming));
         }else{
           const text=element.textContent||'';
-          if(text) words.push({text,time:timeSeconds(element.getAttribute('begin')),endTime:timeSeconds(element.getAttribute('end'))});
+          if(text) words.push({
+            text,
+            time:localBegin!==null||inheritedSpanTiming?elementStart:null,
+            endTime:localEnd!==null?parentOffset+localEnd:null
+          });
         }
       }else{
-        words.push(...parseWords(Array.from(element.childNodes)));
+        words.push(...parseWords(Array.from(element.childNodes),elementStart,hasSpanTiming));
       }
     }
     return words.filter(word=>word.text);
   };
-  const parseBackgroundWords=element=>{
+  const parseBackgroundWords=(element,parentOffset=0)=>{
     const words=[];
-    const visit=node=>{
+    const visit=(node,offset=parentOffset,inheritedTiming=false)=>{
       for(const child of Array.from(node.childNodes||[])){
         if(child.nodeType===Node.TEXT_NODE){
           if(child.textContent) words.push({text:child.textContent,time:null,endTime:null});
         }else if(child.nodeType===Node.ELEMENT_NODE){
           const role=getRole(child);
           if(role==='x-translation'||role==='x-roman') continue;
+          const localBegin=timeSeconds(child.getAttribute('begin'));
+          const localEnd=timeSeconds(child.getAttribute('end'));
+          const childStart=offset+(localBegin??0);
+          const hasTiming=inheritedTiming||localBegin!==null;
           if(child.localName==='span'){
             const nested=Array.from(child.childNodes).some(n=>n.nodeType===Node.ELEMENT_NODE);
-            if(nested) visit(child);
-            else if(child.textContent) words.push({text:child.textContent,time:timeSeconds(child.getAttribute('begin')),endTime:timeSeconds(child.getAttribute('end'))});
-          }else visit(child);
+            if(nested) visit(child,childStart,hasTiming);
+            else if(child.textContent) words.push({
+              text:child.textContent,
+              time:localBegin!==null||inheritedTiming?childStart:null,
+              endTime:localEnd!==null?offset+localEnd:null
+            });
+          }else visit(child,childStart,hasTiming);
         }
       }
     };
-    visit(element);
+    const localBegin=timeSeconds(element.getAttribute('begin'));
+    visit(element,parentOffset+(localBegin??0),localBegin!==null);
     return words.filter(word=>word.text);
   };
   const parsed=[];
   for(const p of Array.from(xml.getElementsByTagNameNS('*','p'))){
-    const lineTime=timeSeconds(p.getAttribute('begin'))??0;
+    const ancestorTimes=[];
+    for(let ancestor=p.parentElement;ancestor;ancestor=ancestor.parentElement) ancestorTimes.push(timeSeconds(ancestor.getAttribute('begin'))??0);
+    const ancestorOffset=ancestorTimes.reverse().reduce((total,value)=>total+value,0);
+    const lineTime=ancestorOffset+(timeSeconds(p.getAttribute('begin'))??0);
     const agent=p.getAttributeNS(ttmNamespace,'agent')||p.getAttribute('ttm:agent')||null;
     const isDuet=hasMultipleSingers && !!agent && agent!==firstAgent;
     const directChildren=Array.from(p.childNodes);
-    const mainWords=parseWords(directChildren);
+    const mainWords=parseWords(directChildren,lineTime);
     const mainText=mainWords.map(word=>word.text).join('').trim();
     if(mainText){
       parsed.push({time:lineTime,text:mainText,words:mainWords,isBG:false,isDuet});
@@ -712,10 +734,10 @@ function parseTtml(value){
     };
     collectBackgrounds(p);
     for(const background of backgrounds){
-      const words=parseBackgroundWords(background);
+      const words=parseBackgroundWords(background,lineTime);
       const text=words.map(word=>word.text).join('').trim();
       if(!text) continue;
-      const bgTime=timeSeconds(background.getAttribute('begin'))??words.find(word=>word.time!==null)?.time??lineTime;
+      const bgTime=words.find(word=>word.time!==null)?.time??lineTime;
       parsed.push({time:bgTime,text,words,isBG:true,isDuet:false});
     }
   }
