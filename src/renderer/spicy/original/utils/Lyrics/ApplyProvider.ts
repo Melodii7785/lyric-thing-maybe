@@ -9,6 +9,7 @@ const ProviderMap: Record<string, string> = {
   spl: "Spicy Lyrics",
   ldb: "Local DB",
   uns: "Unison",
+  "lrc.red": "lrc.red",
 };
 
 const ViaMap: Record<string, { label: string; url?: string }> = {
