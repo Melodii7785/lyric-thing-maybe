@@ -657,10 +657,12 @@ function parseTtml(value){
     for(const node of nodes){
       if(node.nodeType===Node.TEXT_NODE){
         const text=node.textContent||'';
-        if(/^\\s+$/.test(text)&&words.length){
+        if(/^\s+$/.test(text)&&words.length){
           // Keep inter-word spaces attached to the preceding timed syllable.
           words[words.length-1].text+=text;
+          words[words.length-1]._adjacentSpan=false;
         }else if(text){
+          if(words.length) words[words.length-1]._adjacentSpan=false;
           words.push({text,time:null,endTime:null});
         }
         continue;
@@ -680,15 +682,13 @@ function parseTtml(value){
         }else{
           const text=element.textContent||'';
           if(text){
-            const partOfWord=words.length>0 && words[words.length-1].isPartOfWord===true;
-            if(words.length && words[words.length-1]._adjacentSpan===true){
-              words[words.length-1].isPartOfWord=true;
-            }
+            const adjacent=words.length>0 && words[words.length-1]._adjacentSpan===true;
+            if(adjacent) words[words.length-1].isPartOfWord=true;
             words.push({
               text,
               time:localBegin!==null||inheritedSpanTiming?elementStart:null,
               endTime:localEnd!==null?parentOffset+localEnd:null,
-              isPartOfWord:partOfWord,
+              isPartOfWord:adjacent,
               _adjacentSpan:true
             });
           }
