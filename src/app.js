@@ -539,6 +539,7 @@ function spicyVocalWords(vocal, fallbackTime=0){
   return {time:time??0,text,words:syllables};
 }
 function renderSpicyLyrics(data){
+  lyricRendererMode='port';
   currentSpicyLyricsData=data;
   clearLyrics();
   $('lyrics-panel').hidden=false;
@@ -720,22 +721,107 @@ function parseTtml(value){
   }
   return parsed.sort((a,b)=>a.time-b.time);
 }
+function ttmlToSpicyPayload(lines){
+  const hasWordTiming=lines.some(line=>line.words.some(word=>Number.isFinite(word.time)));
+  const hasLineTiming=lines.some(line=>line.time>0);
+  if(!hasWordTiming && !hasLineTiming){
+    return {Type:'Static',StartTime:0,Lines:lines.filter(line=>!line.isBG).map(line=>({Text:line.text}))};
+  }
+  if(!hasWordTiming){
+    const mainLines=lines.filter(line=>!line.isBG);
+    return {
+      Type:'Line',
+      StartTime:mainLines[0]?.time||0,
+      Content:mainLines.map((line,index)=>{
+        const nextStart=mainLines[index+1]?.time;
+        const wordEnd=Math.max(0,...line.words.map(word=>Number.isFinite(word.endTime)?word.endTime:0));
+        return {
+          Text:line.text,
+          StartTime:line.time,
+          EndTime:Math.max(line.time+0.1,wordEnd,nextStart||0)
+        };
+      })
+    };
+  }
+
+  const mainLines=lines.filter(line=>!line.isBG);
+  const backgroundLines=lines.filter(line=>line.isBG);
+  const content=mainLines.map((line,index)=>{
+    const nextStart=mainLines[index+1]?.time??Infinity;
+    const endTime=Math.max(
+      line.time+0.1,
+      ...line.words.map(word=>Number.isFinite(word.endTime)?word.endTime:0)
+    );
+    const toSyllables=(words,lineStart,lineEnd)=>words.map((word,wordIndex)=>{
+      const nextWordStart=words.slice(wordIndex+1).find(next=>Number.isFinite(next.time))?.time;
+      const start=Number.isFinite(word.time)?word.time:lineStart;
+      const end=Number.isFinite(word.endTime)?word.endTime:
+        Number.isFinite(nextWordStart)?nextWordStart:Math.max(start+0.1,lineEnd);
+      return {
+        Text:word.text,
+        StartTime:start,
+        EndTime:Math.max(start+0.01,end),
+        IsPartOfWord:word.isPartOfWord===true
+      };
+    });
+    const backgrounds=backgroundLines
+      .filter(bg=>bg.time>=line.time && bg.time<nextStart)
+      .map(bg=>{
+        const bgEnd=Math.max(bg.time+0.1,...bg.words.map(word=>Number.isFinite(word.endTime)?word.endTime:0));
+        return {
+          StartTime:bg.time,
+          EndTime:bgEnd,
+          Syllables:toSyllables(bg.words,bg.time,bgEnd)
+        };
+      });
+    return {
+      Lead:{
+        StartTime:line.time,
+        EndTime:endTime,
+        Syllables:toSyllables(line.words,line.time,endTime)
+      },
+      ...(backgrounds.length?{Background:backgrounds}:{}),
+      OppositeAligned:line.isDuet===true
+    };
+  });
+  // A background-only TTML passage still needs to be visible. If it could not
+  // be attached to a lead line, render it as its own timed lyric line.
+  for(const bg of backgroundLines){
+    if(content.some(entry=>entry.Background?.some(item=>item.StartTime===bg.time))) continue;
+    const endTime=Math.max(bg.time+0.1,...bg.words.map(word=>Number.isFinite(word.endTime)?word.endTime:0));
+    content.push({
+      Lead:{
+        StartTime:bg.time,
+        EndTime:endTime,
+        Syllables:toSyllables(bg.words,bg.time,endTime)
+      }
+    });
+  }
+  content.sort((a,b)=>a.Lead.StartTime-b.Lead.StartTime);
+  return {Type:'Syllable',StartTime:content[0]?.Lead.StartTime||0,Content:content};
+}
 function renderLyrics(data){
   clearLyrics();
   $('lyrics-panel').hidden=false;
   setAttribution('lrc.red');
-  currentSpicyLyricsData=null;
-  updateRendererToggle();
   lyricLines=parseTtml(data.ttml||'');
   lyricsAreSynced=lyricLines.some(line=>line.words.some(word=>word.time!==null));
   if(!lyricLines.length){
+    currentSpicyLyricsData=null;
+    updateRendererToggle();
     $('lyrics-meta').textContent='lrc.red returned a TTML file, but it did not contain readable lyric lines.';
     return;
   }
+  const spicyPayload=ttmlToSpicyPayload(lyricLines);
+  currentSpicyLyricsData={spicyLyrics:spicyPayload,source:'lrc.red'};
+  lyricRendererMode='port';
   $('lyrics-meta').textContent=lyricsAreSynced
-    ? 'TTML lyrics loaded · AMLL rendering enabled.'
-    : 'TTML lyrics loaded · line timing only.';
-  loadIntoAMLL();
+    ? 'TTML lyrics loaded · word timing preserved.'
+    : spicyPayload.Type==='Line'
+      ? 'TTML lyrics loaded · line timing.'
+      : 'TTML lyrics loaded · static lyrics.';
+  updateRendererToggle();
+  renderSpicyLyricsWithSelectedRenderer();
 }
 function loadIntoAMLL(){
   const amllLines=lyricLines.map((line,index)=>{
