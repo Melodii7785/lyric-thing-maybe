@@ -4,6 +4,10 @@ const ProviderMap: Record<string, string> = {
   spt: "Spotify",
   aml: "Apple Music",
   spl: "Spicy Lyrics",
+  spicy_lyrics: "Spicy Lyrics",
+  apple_music: "Apple Music",
+  spotify: "Spotify",
+  "lrc.red": "lrc.red",
   ldb: "Local DB",
   uns: "Unison",
 };
