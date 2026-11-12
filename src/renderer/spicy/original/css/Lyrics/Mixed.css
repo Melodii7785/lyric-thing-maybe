@@ -1335,3 +1335,12 @@
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+
+/* User-adjustable zoom. The control changes this multiplier without disturbing
+   the renderer's responsive base size or its original word animation metrics. */
+#SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line:not(.bg-line) {
+  font-size: calc(var(--DefaultLyricsSize) * var(--SL-LyricsZoom, 1)) !important;
+}
+#SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line.bg-line {
+  font-size: calc(var(--DefaultLyricsSize) * 0.75 * var(--SL-LyricsZoom, 1)) !important;
+}
