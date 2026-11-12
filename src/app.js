@@ -843,49 +843,49 @@ function renderQueueItem(item,current=false){
   const image=document.createElement('img');image.alt='';image.src=item.image||'';image.hidden=!item.image;
   const text=document.createElement('span'),title=document.createElement('strong'),subtitle=document.createElement('small');
   title.textContent=(current?'▶ ':'')+item.title;
-  subtitle.textContent=(item.artists||[]).join(', ')||item.album||item.type||'Spotify item';
+  subtitle.textContent=(item.artists||[]).join(', ')||item.album||item.type||'some song, probably';
   text.append(title,subtitle);button.append(image,text);
   if(!current&&item.uri)button.addEventListener('click',()=>playQueueItem(item.uri));
   li.append(button);return li;
 }
 async function loadPlaylists(){
   const select=$('playlist-select'),button=$('play-playlist');
-  select.disabled=true;button.disabled=true;select.replaceChildren(new Option('loading your playlists…',''));
+  select.disabled=true;button.disabled=true;select.replaceChildren(new Option('fetching your playlists. hold on…',''));
   try{
     const data=await api('/api/spotify/playlists');spotifyPlaylists=Array.isArray(data.playlists)?data.playlists:[];
     select.replaceChildren();
-    if(!spotifyPlaylists.length){select.append(new Option('no playlists found',''));$('device-status').textContent='no playlists came back. perhaps spotify is having a moment.';return;}
-    select.append(new Option('choose a playlist…',''));
+    if(!spotifyPlaylists.length){select.append(new Option('no playlists. not even one. tragic.',''));$('device-status').textContent='spotify came back empty-handed. how rude.';return;}
+    select.append(new Option('pick your poison…',''));
     for(const playlist of spotifyPlaylists)select.append(new Option(playlist.name+' · '+playlist.tracksTotal+' tracks',playlist.uri));
-    $('device-status').textContent='loaded '+spotifyPlaylists.length+' playlists. choose one!!';
-  }catch(error){select.replaceChildren(new Option('could not load playlists',''));$('device-status').textContent='playlist loading failed: '+error.message;}
+    $('device-status').textContent='found '+spotifyPlaylists.length+' playlists!! go on, pick one.';
+  }catch(error){select.replaceChildren(new Option('playlist loading went kaput',''));$('device-status').textContent='could not fetch your playlists. spotify, explain yourself: '+error.message;}
   finally{select.disabled=false;button.disabled=!spotifyPlaylists.length;}
 }
 async function playSelectedPlaylist(){
-  const uri=$('playlist-select').value;if(!uri){$('device-status').textContent='choose a playlist first.';return;}
-  const button=$('play-playlist');button.disabled=true;$('device-status').textContent='starting that playlist…';
+  const uri=$('playlist-select').value;if(!uri){$('device-status').textContent='you gotta pick a playlist first. i can't read minds.';return;}
+  const button=$('play-playlist');button.disabled=true;$('device-status').textContent='putting your playlist on. one moment…';
   try{
     await api('/api/spotify/player/play',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({context_uri:uri,device_id:selectedDevice()||undefined})});
-    $('device-status').textContent='playlist started!!';await playback();if(!$('queue-panel').hidden)await refreshQueue();
-  }catch(error){$('device-status').textContent='could not start that playlist: '+error.message;}
+    $('device-status').textContent='there we go!! playlist time.';await playback();if(!$('queue-panel').hidden)await refreshQueue();
+  }catch(error){$('device-status').textContent='that playlist refused to start. rude. ('+error.message+');}
   finally{button.disabled=!spotifyPlaylists.length;}
 }
 async function playQueueItem(uri){
-  $('queue-status').textContent='jumping to that song…';
+  $('queue-status').textContent='OHOHO. skipping straight to that one…';
   try{
     await api('/api/spotify/player/play',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({uris:[uri],device_id:selectedDevice()||undefined})});
     await playback();await refreshQueue();
-  }catch(error){$('queue-status').textContent='could not play that queue item: '+error.message;}
+  }catch(error){$('queue-status').textContent='could not play that song. spotify said no. ('+error.message+');}
 }
 async function refreshQueue(){
-  if(queueRefreshInFlight)return;queueRefreshInFlight=true;$('queue-status').textContent='fetching the queue…';
+  if(queueRefreshInFlight)return;queueRefreshInFlight=true;$('queue-status').textContent='asking spotify what's next…';
   try{
     const data=await api('/api/spotify/queue'),list=$('queue-list');list.replaceChildren();
     if(data.current)list.append(renderQueueItem(data.current,true));
     (data.queue||[]).forEach(item=>list.append(renderQueueItem(item,false)));
-    $('queue-status').textContent=(data.queue||[]).length+' upcoming item(s). click one to play it now.';
-    if(!data.current&&!(data.queue||[]).length)$('queue-status').textContent='the queue is empty. a clean slate.';
-  }catch(error){$('queue-status').textContent='could not fetch queue: '+error.message;}
+    $('queue-status').textContent=(data.queue||[]).length+' thing(s) coming up. click one to play it right now!!';
+    if(!data.current&&!(data.queue||[]).length)$('queue-status').textContent='nothing in the queue. the future is unwritten.';
+  }catch(error){$('queue-status').textContent='the queue wouldn't load. spotify is being difficult: '+error.message;}
   finally{queueRefreshInFlight=false;}
 }
 async function playerCommand(action, extra={}){
