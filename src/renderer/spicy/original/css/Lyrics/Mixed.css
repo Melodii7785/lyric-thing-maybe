@@ -1344,3 +1344,13 @@
 #SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line.bg-line {
   font-size: calc(var(--DefaultLyricsSize) * 0.75 * var(--SL-LyricsZoom, 1)) !important;
 }
+
+
+/* Desktop: don't reserve a huge tail of empty scroll space beneath the lyrics.
+   Keep a little breathing room so the final line can still settle naturally. */
+@media (min-width: 901px) {
+  #SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent
+    > .SpicyLyricsScrollContainer {
+    padding-bottom: 5vh !important;
+  }
+}
