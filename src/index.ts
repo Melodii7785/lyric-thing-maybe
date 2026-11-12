@@ -143,7 +143,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     authorize.search = new URLSearchParams({
       response_type: "code", client_id: env.CLIENT_ID,
       redirect_uri: env.SPOTIFY_REDIRECT_URI,
-      scope: "user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state", state,
+      scope: "user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state playlist-read-private playlist-read-collaborative", state,
     }).toString();
     return Response.redirect(authorize.toString(), 302);
   }
@@ -238,6 +238,35 @@ async function handle(request: Request, env: Env): Promise<Response> {
       volumePercent: device.volume_percent ?? null, supportsVolume: !!device.supports_volume,
     })) : [] });
   }
+  if ((path === "/api/spotify/queue" || path === "/api/spotify/playlists") && request.method === "GET") {
+    let session = await getSession(request, env);
+    if (!session) return json({ error: "not_connected" }, 401);
+    try { session = await refresh(session, env); }
+    catch {
+      await env.DB.prepare("DELETE FROM sessions WHERE session_hash = ?").bind(session.session_hash).run();
+      return json({ error: "spotify_reconnect_required" }, 401);
+    }
+    const isQueue = path.endsWith("/queue");
+    const endpoint = isQueue ? "/me/player/queue" : "/me/playlists?limit=50";
+    const response = await fetch(API_URL + endpoint, {headers:{authorization:"Bearer "+await decrypt(env,session.access_token_enc),accept:"application/json"}});
+    if (response.status === 401) return json({ error: "spotify_reconnect_required" }, 401);
+    if (response.status === 403) return json({ error: "spotify_access_denied", ...spotifyUpstreamDiagnostics(endpoint, response) }, 403);
+    if (response.status === 429) return json({ error: "spotify_rate_limited" }, 429);
+    if (!response.ok) return json({ error: "spotify_request_failed", ...spotifyUpstreamDiagnostics(endpoint, response) }, 502);
+    const data = await response.json() as any;
+    const simplify = (item: any) => item ? ({
+      uri:item.uri??null,title:item.name??"Unknown title",
+      artists:Array.isArray(item.artists)?item.artists.map((artist:any)=>artist.name).filter(Boolean):[],
+      album:item.album?.name??(item.type==="episode"?item.show?.name:null)??null,
+      image:item.album?.images?.[0]?.url??item.images?.[0]?.url??item.show?.images?.[0]?.url??null,
+      type:item.type??"track",
+    }) : null;
+    if (isQueue) return json({current:simplify(data.currently_playing),queue:Array.isArray(data.queue)?data.queue.map(simplify).filter(Boolean):[]});
+    return json({playlists:Array.isArray(data.items)?data.items.map((item:any)=>({
+      id:item.id??null,uri:item.uri??null,name:item.name??"Untitled playlist",image:item.images?.[0]?.url??null,
+      tracksTotal:item.tracks?.total??0,owner:item.owner?.display_name??null,
+    })).filter((item:any)=>item.uri):[],total:data.total??0});
+  }
   if (path.startsWith("/api/spotify/player/") && request.method === "POST") {
     let session = await getSession(request, env);
     if (!session) return json({ error: "not_connected" }, 401);
@@ -269,7 +298,11 @@ async function handle(request: Request, env: Env): Promise<Response> {
       accept: "application/json",
     };
     let requestBody: string | undefined;
-    if (action === "transfer") {
+    if (action === "play" && ((typeof body.context_uri === "string" && body.context_uri.startsWith("spotify:")) || (Array.isArray(body.uris) && body.uris.every((uri: any) => typeof uri === "string" && uri.startsWith("spotify:"))))) {
+      requestBody = JSON.stringify(body.context_uri ? { context_uri: body.context_uri } : { uris: body.uris });
+      headers["content-type"] = "application/json";
+      if (typeof body.device_id === "string" && body.device_id) apiUrl.searchParams.set("device_id", body.device_id);
+    } else if (action === "transfer") {
       if (typeof body.device_id !== "string" || !body.device_id) return json({ error: "device_required" }, 400);
       requestBody = JSON.stringify({ device_ids: [body.device_id], play: body.play !== false });
       headers["content-type"] = "application/json";
