@@ -667,7 +667,7 @@ class LyricsVirtualizer {
       this._containerHeight = clientHeight;
       this._blockLayoutGlide(LAYOUT_GLIDE_BLOCK_MS);
       this._smoothGeometry = null;
-      if (this._spacer) this._spacer.style.height = `${clientHeight / 2}px`;
+      if (this._spacer) this._spacer.style.height = `${Math.min(clientHeight / 2, 80)}px`;
       this._remeasureVisible();
       v._willUpdate();
       return;
@@ -681,7 +681,7 @@ class LyricsVirtualizer {
       });
       this._containerHeight = clientHeight;
       this._smoothGeometry = null;
-      if (this._spacer) this._spacer.style.height = `${clientHeight / 2}px`;
+      if (this._spacer) this._spacer.style.height = `${Math.min(clientHeight / 2, 80)}px`;
       v._willUpdate();
       return;
     }
@@ -904,7 +904,7 @@ class LyricsVirtualizer {
     spacer.style.flexShrink = "0";
     spacer.style.pointerEvents = "none";
     spacer.setAttribute("aria-hidden", "true");
-    spacer.style.height = `${scrollEl.clientHeight / 2}px`;
+    spacer.style.height = `${Math.min(scrollEl.clientHeight / 2, 80)}px`;
     scrollEl.appendChild(spacer);
     this._spacer = spacer;
     this._maid!.Give(() => spacer.parentElement?.removeChild(spacer));
@@ -921,7 +921,7 @@ class LyricsVirtualizer {
       }
       // The viewport moved under a glide in flight; have it re-read its geometry.
       this._smoothGeometry = null;
-      if (this._spacer) this._spacer.style.height = `${el.clientHeight / 2}px`;
+      if (this._spacer) this._spacer.style.height = `${Math.min(el.clientHeight / 2, 80)}px`;
       if (Math.abs(newWidth - this._containerWidth) < 1) {
         // Width unchanged, but a height-only resize (vertical-only window resize,
         // PIP) still changes the visible window. The early return would otherwise
