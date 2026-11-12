@@ -1,4 +1,4 @@
-import { CreditsRow } from "./CreditsRow.ts";
+import { CreditsRow } from "./Applyer/Credits/CreditsRow.ts";
 
 const ProviderMap: Record<string, string> = {
   spicy_lyrics: "Spicy Lyrics",
