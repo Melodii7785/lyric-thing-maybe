@@ -627,6 +627,8 @@ function timeSeconds(value){
   if(!value) return null;
   const input=value.trim();
   if(/^\d+(?:\.\d+)?s$/.test(input)) return Number(input.slice(0,-1));
+  // lrc.red line-timed TTML uses bare decimal seconds (for example, "2.770").
+  if(/^\d+(?:\.\d+)?$/.test(input)) return Number(input);
   const parts=input.split(':');
   if(parts.length===3) return Number(parts[0])*3600+Number(parts[1])*60+Number(parts[2]);
   if(parts.length===2) return Number(parts[0])*60+Number(parts[1]);
@@ -715,9 +717,12 @@ function parseTtml(value){
     const ancestorTimes=[];
     for(let ancestor=p.parentElement;ancestor;ancestor=ancestor.parentElement) ancestorTimes.push(timeSeconds(ancestor.getAttribute('begin'))??0);
     const ancestorOffset=ancestorTimes.reverse().reduce((total,value)=>total+value,0);
-    const lineTime=ancestorOffset+(timeSeconds(p.getAttribute('begin'))??0);
+    const explicitBegin=timeSeconds(p.getAttribute('begin'));
     const explicitEnd=timeSeconds(p.getAttribute('end'));
-    const lineEnd=explicitEnd===null?null:ancestorOffset+explicitEnd;
+    // lrc.red's <p> timestamps are already on the song timeline, even when
+    // the containing <div> repeats the first line's begin timestamp.
+    const lineTime=explicitBegin??ancestorOffset;
+    const lineEnd=explicitEnd===null?null:(explicitBegin!==null?explicitEnd:ancestorOffset+explicitEnd);
     const agent=p.getAttributeNS(ttmNamespace,'agent')||p.getAttribute('ttm:agent')||null;
     const isDuet=hasMultipleSingers && !!agent && agent!==firstAgent;
     const directChildren=Array.from(p.childNodes);
