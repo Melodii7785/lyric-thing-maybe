@@ -1341,9 +1341,7 @@
 #SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line:not(.bg-line) {
   font-size: calc(var(--DefaultLyricsSize) * var(--SL-LyricsZoom, 1)) !important;
 }
-#SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line.bg-line {
-  font-size: calc(var(--DefaultLyricsSize) * 0.75 * var(--SL-LyricsZoom, 1)) !important;
-}
+/* Background-vocal lines keep the original renderer's own sizing. */
 
 
 /* Desktop: don't reserve a huge tail of empty scroll space beneath the lyrics.
