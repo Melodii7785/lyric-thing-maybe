@@ -943,7 +943,7 @@
 #SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line.bg-line .word,
 #SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line.bg-line .letterGroup,
 #SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line.bg-line .letterGroup .letter {
-  --font-size: calc(var(--DefaultLyricsSize) * 0.5);
+  --font-size: calc(var(--DefaultLyricsSize) * 0.6);
   font-size: var(--font-size) !important;
   font-weight: 600 !important;
 }
