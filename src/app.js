@@ -613,7 +613,7 @@ function renderSpicyLyricsWithSelectedRenderer(){
   if(lyricRendererMode==='port'){
     amllElement.style.display='none';
     try{
-      const applied=originalSpicyEngine.apply(currentSpicyLyricsData.spicyLyrics||currentSpicyLyricsData);
+      const applied=originalSpicyEngine.apply(currentSpicyLyricsData);
       const page=lyricHost.querySelector('.SpicyLyricsPage');
       if(!applied || !page) throw new Error('Original Spicy renderer did not create lyric content.');
       page.style.display='';
