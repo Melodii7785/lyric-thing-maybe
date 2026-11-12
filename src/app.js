@@ -20,10 +20,38 @@ let amllPlayer = new LyricPlayer();
 let originalSpicyEngine = null;
 let currentSpicyLyricsData = null;
 let lyricRendererMode = 'amll';
+const LYRICS_ZOOM_KEY = 'lyricthing.spicyLyricsZoom';
+const LYRICS_ZOOM_STEP = 0.1;
+const LYRICS_ZOOM_MIN = 0.6;
+const LYRICS_ZOOM_MAX = 2.2;
+let lyricsZoom = 1;
+let savedLyricsZoom = 1;
+function readLyricsZoom(){
+  try {
+    const value=Number(localStorage.getItem(LYRICS_ZOOM_KEY));
+    return Number.isFinite(value)&&value>=LYRICS_ZOOM_MIN&&value<=LYRICS_ZOOM_MAX?value:1;
+  } catch { return 1; }
+}
+function applyLyricsZoom(){
+  const page=lyricHost.querySelector('.SpicyLyricsPage');
+  if(page) page.style.setProperty('--SL-LyricsZoom',String(lyricsZoom));
+  $('lyrics-zoom-save').textContent=Math.abs(lyricsZoom-savedLyricsZoom)<0.001
+    ? "that's it. saved for the future. ✓"
+    : "that's it. save it for the future.";
+  $('lyrics-zoom-in').disabled=lyricsZoom>=LYRICS_ZOOM_MAX;
+  $('lyrics-zoom-out').disabled=lyricsZoom<=LYRICS_ZOOM_MIN;
+}
+function changeLyricsZoom(amount){
+  lyricsZoom=Math.min(LYRICS_ZOOM_MAX,Math.max(LYRICS_ZOOM_MIN,Math.round((lyricsZoom+amount)*100)/100));
+  applyLyricsZoom();
+}
+
 let lastFrameTime = null;
 const lyricHost = $('lyrics');
 lyricHost.appendChild(amllPlayer.getElement());
 originalSpicyEngine = new OriginalSpicyLyricsEngine(lyricHost);
+lyricsZoom=readLyricsZoom();
+savedLyricsZoom=lyricsZoom;
 amllPlayer.setOptimizeOptions({
   normalizeSpaces: false,
   resetLineTimestamps: false,
@@ -951,6 +979,18 @@ function stopPolling(){
   if(poller) clearInterval(poller);
   poller=null;
 }
+$('lyrics-zoom-in').addEventListener('click',()=>changeLyricsZoom(LYRICS_ZOOM_STEP));
+$('lyrics-zoom-out').addEventListener('click',()=>changeLyricsZoom(-LYRICS_ZOOM_STEP));
+$('lyrics-zoom-save').addEventListener('click',()=>{
+  try {
+    localStorage.setItem(LYRICS_ZOOM_KEY,String(lyricsZoom));
+    savedLyricsZoom=lyricsZoom;
+    applyLyricsZoom();
+  } catch(error) {
+    console.warn('[Lyrics zoom] Could not save preference',error);
+    $('lyrics-zoom-save').textContent='could not save. storage said no.';
+  }
+});
 $('renderer-toggle-button').addEventListener('click',()=>{
   if(!currentSpicyLyricsData) return;
   lyricRendererMode=lyricRendererMode==='amll'?'port':'amll';
