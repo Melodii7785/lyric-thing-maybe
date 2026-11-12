@@ -867,7 +867,7 @@ async function playSelectedPlaylist(){
   try{
     await api('/api/spotify/player/play',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({context_uri:uri,device_id:selectedDevice()||undefined})});
     $('device-status').textContent='there we go!! playlist time.';await playback();if(!$('queue-panel').hidden)await refreshQueue();
-  }catch(error){$('device-status').textContent='that playlist refused to start. rude. ('+error.message+');}
+  }catch(error){$('device-status').textContent='that playlist refused to start. rude. ('+error.message+')';}
   finally{button.disabled=!spotifyPlaylists.length;}
 }
 async function playQueueItem(uri){
@@ -875,7 +875,7 @@ async function playQueueItem(uri){
   try{
     await api('/api/spotify/player/play',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({uris:[uri],device_id:selectedDevice()||undefined})});
     await playback();await refreshQueue();
-  }catch(error){$('queue-status').textContent='could not play that song. spotify said no. ('+error.message+');}
+  }catch(error){$('queue-status').textContent='could not play that song. spotify said no. ('+error.message+')';}
 }
 async function refreshQueue(){
   if(queueRefreshInFlight)return;queueRefreshInFlight=true;$('queue-status').textContent='asking spotify what's next…';
