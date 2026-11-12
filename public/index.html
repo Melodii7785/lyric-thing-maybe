@@ -153,16 +153,19 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
 @media(min-width:901px){
   body{max-width:1440px}
   .track{display:none!important}
-  #lyrics-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,460px);column-gap:clamp(100px,12vw,220px);align-items:start;max-width:1380px}
+  /* Keep the artwork out of grid sizing: its square cover was making row 3
+     as tall as the whole now-playing card, pushing the lyric attribution far
+     below the actual lyrics viewport. */
+  #lyrics-panel{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,460px);column-gap:clamp(100px,12vw,220px);align-items:start;max-width:1380px}
   #lyrics-panel>h2,#lyrics-panel>#lyrics-meta{grid-column:1}
-  #lyrics{grid-column:1;grid-row:3;min-width:0;height:clamp(280px,48vh,560px);max-height:56vh}
-  #lyrics-attribution{grid-column:1}
-  .nowbar{display:block!important;grid-column:2;grid-row:3;position:sticky;top:48px;width:100%;text-align:center;align-self:start}
+  #lyrics{grid-column:1;grid-row:3;min-width:0;height:clamp(280px,48vh,560px);max-height:56vh;margin-top:10px}
+  #lyrics-attribution{grid-column:1;grid-row:4;margin-top:10px}
+  .nowbar{display:block!important;position:absolute;top:72px;right:0;width:min(100%,460px);text-align:center;align-self:start}
   .nowbar img,.nowbar video{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:0;background:#222;box-shadow:0 10px 30px rgba(0,0,0,.18)}
   .nowbar video{display:none}
   .nowbar img.art-changing{animation:nowbar-art-in .42s cubic-bezier(.2,.8,.2,1)}
   @keyframes nowbar-art-in{from{opacity:0;transform:translateX(-48px)}to{opacity:1;transform:translateX(0)}}
-  .nowbar h2{margin:28px 0 4px;font-size:clamp(1.5rem,2.2vw,2.25rem);line-height:1.15;letter-spacing:-.035em;color:#fff}
+  .nowbar h2{margin:12px 0 4px;font-size:clamp(1.5rem,2.2vw,2.25rem);line-height:1.15;letter-spacing:-.035em;color:#fff}
   .nowbar p{margin:0;color:#ddd;font-size:1.05rem}
 }
 @media(max-width:900px){
