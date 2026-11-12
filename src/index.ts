@@ -608,7 +608,17 @@ async function handle(request: Request, env: Env): Promise<Response> {
             (Array.isArray(entry?.Background) && entry.Background.some(hasRenderableVocal))
           );
           if (body && hasRenderableLines) {
-            return json({ track: trackInfo, spicyLyrics: body });
+            // Preserve API attribution fields that live beside Body. The
+            // browser renderer needs these to identify the actual provider
+            // and show community uploader/maker credits.
+            return json({
+              track: trackInfo,
+              spicyLyrics: body,
+              source: body.source ?? spicyPayload?.source ?? null,
+              source_via: body.source_via ?? spicyPayload?.source_via ?? null,
+              UploadAttribution: body.UploadAttribution ?? spicyPayload?.UploadAttribution ?? null,
+              SongWriters: body.SongWriters ?? spicyPayload?.SongWriters ?? null,
+            });
           }
         }
       } catch {
