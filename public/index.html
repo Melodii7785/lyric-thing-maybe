@@ -160,6 +160,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
   #lyrics-panel>h2,#lyrics-panel>#lyrics-meta{grid-column:1}
   #lyrics{grid-column:1;grid-row:3;min-width:0;height:clamp(280px,48vh,560px);max-height:56vh;margin-top:10px}
   #lyrics-attribution{grid-column:1;grid-row:4;margin-top:10px}
+  #appearance-settings{grid-column:1;min-width:0;max-width:100%}
   .nowbar{display:block!important;position:absolute;top:72px;right:0;width:min(100%,460px);text-align:center;align-self:start}
   .nowbar img,.nowbar video{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:0;background:#222;box-shadow:0 10px 30px rgba(0,0,0,.18)}
   .nowbar video{display:none}
@@ -259,30 +260,31 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
     </aside>
     <div id="lyrics" aria-live="polite"></div>
     <p class="muted" id="lyrics-attribution">credit where credit is due!!</p>
+    <details id="appearance-settings" class="appearance-settings">
+      <summary>✨ appearance & renderer settings</summary>
+      <div class="appearance-grid">
+        <label class="appearance-field" for="appearance-font">lyrics font
+          <select id="appearance-font">
+            <option value="sf">SF Pro Display (default)</option>
+            <option value="roboto">Roboto Flex</option>
+            <option value="system">System font</option>
+            <option value="arial">Arial</option>
+          </select>
+        </label>
+        <label class="appearance-check"><input id="appearance-simple" type="checkbox"> simple lyrics mode</label>
+        <label class="appearance-check"><input id="appearance-blur" type="checkbox" checked> lyric glow / blur</label>
+        <label class="appearance-check"><input id="appearance-animations" type="checkbox" checked> lyric animations</label>
+      </div>
+      <div class="appearance-zoom">
+        <span>lyrics size</span>
+        <button id="lyrics-zoom-out" class="secondary" type="button" title="Make lyrics smaller">−</button>
+        <button id="lyrics-zoom-in" class="secondary" type="button" title="Make lyrics bigger">+</button>
+        <button id="lyrics-zoom-save" class="secondary" type="button" title="Save the current lyric zoom level">save size</button>
+      </div>
+      <p class="muted">These settings apply to the original Spicy Lyrics renderer and are saved on this device.</p>
+    </details>
   </div>
-  <details id="appearance-settings" class="appearance-settings">
-    <summary>✨ appearance & renderer settings</summary>
-    <div class="appearance-grid">
-      <label class="appearance-field" for="appearance-font">lyrics font
-        <select id="appearance-font">
-          <option value="sf">SF Pro Display (default)</option>
-          <option value="roboto">Roboto Flex</option>
-          <option value="system">System font</option>
-          <option value="arial">Arial</option>
-        </select>
-      </label>
-      <label class="appearance-check"><input id="appearance-simple" type="checkbox"> simple lyrics mode</label>
-      <label class="appearance-check"><input id="appearance-blur" type="checkbox" checked> lyric glow / blur</label>
-      <label class="appearance-check"><input id="appearance-animations" type="checkbox" checked> lyric animations</label>
-    </div>
-    <div class="appearance-zoom">
-      <span>lyrics size</span>
-      <button id="lyrics-zoom-out" class="secondary" type="button" title="Make lyrics smaller">−</button>
-      <button id="lyrics-zoom-in" class="secondary" type="button" title="Make lyrics bigger">+</button>
-      <button id="lyrics-zoom-save" class="secondary" type="button" title="Save the current lyric zoom level">save size</button>
-    </div>
-    <p class="muted">These settings apply to the original Spicy Lyrics renderer and are saved on this device.</p>
-  </details>
+
 </section>
 <p class="muted">made with AMLL + Spicy Lyrics + questionable amounts of hope. lyrics may be synced, unsynced, or simply not here. technology!!</p>
 
