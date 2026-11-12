@@ -348,6 +348,7 @@ async function searchAppleCoverDirect(track){
   const wantedArtist = normalize((track.artists || [])[0]);
   const wantedAlbum = normalize(track.album);
   const wantedTitle = normalize(track.title);
+  const wantedReleaseYear = String(track.albumReleaseDate || '').match(/^\d{4}/)?.[0] || null;
   const artistQuery = (track.artists || [])[0] || '';
 
   // Search all three catalog entity types. The song verifies the recording;
@@ -405,6 +406,8 @@ async function searchAppleCoverDirect(track){
       else if (album && wantedAlbum && (album.includes(wantedAlbum) || wantedAlbum.includes(album))) score += 45;
       if (wantedArtist && (artist === wantedArtist || artist.includes(wantedArtist) || wantedArtist.includes(artist))) score += 50;
       if (matchedArtistId && item.artistId === matchedArtistId) score += 25;
+      const resultYear = String(item.releaseDate || '').match(/^\d{4}/)?.[0] || null;
+      if (wantedReleaseYear && resultYear) score += resultYear === wantedReleaseYear ? 100 : -100;
       return { item, score };
     })
     .sort((a,b) => b.score-a.score)
@@ -418,7 +421,8 @@ async function searchAppleCoverDirect(track){
       exactAlbum = lookupResults.find(item =>
         (item.wrapperType === 'collection' || item.collectionId) &&
         normalize(item.collectionName) === wantedAlbum &&
-        (!matchedArtistId || item.artistId === matchedArtistId)
+        (!matchedArtistId || item.artistId === matchedArtistId) &&
+        (!wantedReleaseYear || !item.releaseDate || String(item.releaseDate).startsWith(wantedReleaseYear))
       ) || lookupResults.find(item => item.wrapperType === 'collection') || null;
     } catch(error) {
       console.warn('[Apple album collection lookup failed]', error);
@@ -440,6 +444,8 @@ async function searchAppleCoverDirect(track){
     : albumMatch?.artworkUrl100 ? 'spotify-album-search'
     : 'song-fallback';
   best.albumArtworkName = exactAlbum?.collectionName || albumMatch?.collectionName || null;
+  best.albumArtworkReleaseDate = exactAlbum?.releaseDate || albumMatch?.releaseDate || null;
+  best.spotifyAlbumReleaseDate = track.albumReleaseDate || null;
   best.artistLookupName = artistMatch?.artistName || null;
   best.artistLookupId = matchedArtistId;
   best.songCollectionName = songMatch?.collectionName || null;
