@@ -9,6 +9,7 @@ import { Animate as animateOriginalSpicyLyrics } from './renderer/spicy/original
 import { TimeSetter as setOriginalSpicyLyricsTime } from './renderer/spicy/original/utils/Lyrics/Animator/Lyrics/LyricsSetter.ts';
 import { QueueForceScroll } from './renderer/spicy/original/utils/Scrolling/ScrollToActiveLine.ts';
 import { $simpleLyricsMode } from './renderer/spicy/original/utils/stores.ts';
+import { LyricsObject } from './renderer/spicy/original/utils/Lyrics/lyrics.ts';
 
 const $ = id => document.getElementById(id);
 let poller = null;
@@ -44,7 +45,7 @@ function applyLyricsZoom(){
 }
 
 const APPEARANCE_KEY = 'lyricthing.originalAppearance';
-const APPEARANCE_DEFAULTS = { font: 'sf', simple: false, blur: true, animations: true };
+const APPEARANCE_DEFAULTS = { font: 'sf', simple: false, blur: true, animations: true, seekFadeCompensation: true };
 function readAppearance(){
   try { return { ...APPEARANCE_DEFAULTS, ...JSON.parse(localStorage.getItem(APPEARANCE_KEY)||'{}') }; }
   catch { return { ...APPEARANCE_DEFAULTS }; }
@@ -64,6 +65,7 @@ function syncAppearanceControls(){
   $('appearance-simple').checked = appearance.simple;
   $('appearance-blur').checked = appearance.blur;
   $('appearance-animations').checked = appearance.animations;
+  $('appearance-seek-fade').checked = appearance.seekFadeCompensation;
 }
 function saveAppearance(){
   try { localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearance)); }
@@ -1233,6 +1235,7 @@ $('appearance-font').addEventListener('change',()=>{appearance.font=$('appearanc
 $('appearance-simple').addEventListener('change',()=>{appearance.simple=$('appearance-simple').checked;saveAppearance();});
 $('appearance-blur').addEventListener('change',()=>{appearance.blur=$('appearance-blur').checked;saveAppearance();});
 $('appearance-animations').addEventListener('change',()=>{appearance.animations=$('appearance-animations').checked;saveAppearance();});
+$('appearance-seek-fade').addEventListener('change',()=>{appearance.seekFadeCompensation=$('appearance-seek-fade').checked;saveAppearance();});
 syncAppearanceControls();
 $('lyrics-zoom-in').addEventListener('click',()=>changeLyricsZoom(LYRICS_ZOOM_STEP));
 $('lyrics-zoom-out').addEventListener('click',()=>changeLyricsZoom(-LYRICS_ZOOM_STEP));
@@ -1294,6 +1297,36 @@ $('refresh-fancy-background').onclick=async()=>{
   }
 };
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('okay bye Spotify. see you later i guess.')}catch(e){say('Spotify would not let me leave. '+e.message)}};
+
+async function seekToLyricLine(lineElement){
+  if(!lineElement || lineElement.classList.contains('musical-line')) return;
+  const lyricType=currentSpicyLyricsData?.spicyLyrics?.Type;
+  const lines=lyricType==='Syllable'?LyricsObject.Types.Syllable.Lines
+    :lyricType==='Line'?LyricsObject.Types.Line.Lines:[];
+  const lyricLine=lines.find(item=>item.HTMLElement===lineElement);
+  if(!lyricLine || !Number.isFinite(lyricLine.StartTime)) return;
+  const compensation=appearance.seekFadeCompensation?300:0;
+  const position=Math.max(0,Math.round(lyricLine.StartTime-compensation));
+  lineElement.classList.add('seeking');
+  try{
+    await api('/api/spotify/player/seek',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({position_ms:position,device_id:selectedDevice()||undefined})});
+    latestProgressMs=position;
+    progressObservedAt=Date.now();
+    renderProgress();
+    $('device-status').textContent='jumped to that line. wheeeee.';
+  }catch(error){
+    $('device-status').textContent='could not jump to that line: '+error.message;
+  }finally{
+    lineElement.classList.remove('seeking');
+  }
+}
+lyricHost.addEventListener('click',event=>{
+  if(lyricRendererMode!=='port') return;
+  const target=event.target instanceof Element?event.target:null;
+  const line=target?.closest('.SpicyLyricsPage .LyricsContent .line');
+  if(line) void seekToLyricLine(line);
+});
+
 function animateAMLL(frameTime){
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
   lastFrameTime=frameTime;
