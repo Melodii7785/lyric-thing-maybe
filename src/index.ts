@@ -357,7 +357,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return json({ playing: !!data.is_playing, progressMs: data.progress_ms ?? null, repeatState: data.repeat_state ?? "off", shuffleState: !!data.shuffle_state, track: {
       id: track.id ?? null, title: track.name ?? "Unknown track",
       artists: Array.isArray(track.artists) ? track.artists.map((a: any) => a.name).filter(Boolean) : [],
-      album: track.album?.name ?? null, image: track.album?.images?.[0]?.url ?? null,
+      album: track.album?.name ?? null, albumReleaseDate: track.album?.release_date ?? null, image: track.album?.images?.[0]?.url ?? null,
       durationMs: track.duration_ms ?? null, uri: track.uri ?? null,
     }});
   }
