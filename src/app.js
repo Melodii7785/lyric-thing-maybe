@@ -792,6 +792,8 @@ let availableDevices = [];
 let selectedDeviceId = '';
 let shuffleEnabled = false;
 let repeatState = 'off';
+let spotifyPlaylists = [];
+let queueRefreshInFlight = false;
 let trackDurationMs = 0;
 let seekingProgress = false;
 function formatTime(ms){const s=Math.max(0,Math.floor((Number(ms)||0)/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
@@ -835,6 +837,57 @@ async function loadDevices(){
     status.textContent='could not find the devices. rude. ('+error.message+')';
   }
 }
+function renderQueueItem(item,current=false){
+  const li=document.createElement('li'),button=document.createElement('button');
+  button.type='button';button.className='queue-track';button.disabled=!item.uri;
+  const image=document.createElement('img');image.alt='';image.src=item.image||'';image.hidden=!item.image;
+  const text=document.createElement('span'),title=document.createElement('strong'),subtitle=document.createElement('small');
+  title.textContent=(current?'▶ ':'')+item.title;
+  subtitle.textContent=(item.artists||[]).join(', ')||item.album||item.type||'Spotify item';
+  text.append(title,subtitle);button.append(image,text);
+  if(!current&&item.uri)button.addEventListener('click',()=>playQueueItem(item.uri));
+  li.append(button);return li;
+}
+async function loadPlaylists(){
+  const select=$('playlist-select'),button=$('play-playlist');
+  select.disabled=true;button.disabled=true;select.replaceChildren(new Option('loading your playlists…',''));
+  try{
+    const data=await api('/api/spotify/playlists');spotifyPlaylists=Array.isArray(data.playlists)?data.playlists:[];
+    select.replaceChildren();
+    if(!spotifyPlaylists.length){select.append(new Option('no playlists found',''));$('device-status').textContent='no playlists came back. perhaps spotify is having a moment.';return;}
+    select.append(new Option('choose a playlist…',''));
+    for(const playlist of spotifyPlaylists)select.append(new Option(playlist.name+' · '+playlist.tracksTotal+' tracks',playlist.uri));
+    $('device-status').textContent='loaded '+spotifyPlaylists.length+' playlists. choose one!!';
+  }catch(error){select.replaceChildren(new Option('could not load playlists',''));$('device-status').textContent='playlist loading failed: '+error.message;}
+  finally{select.disabled=false;button.disabled=!spotifyPlaylists.length;}
+}
+async function playSelectedPlaylist(){
+  const uri=$('playlist-select').value;if(!uri){$('device-status').textContent='choose a playlist first.';return;}
+  const button=$('play-playlist');button.disabled=true;$('device-status').textContent='starting that playlist…';
+  try{
+    await api('/api/spotify/player/play',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({context_uri:uri,device_id:selectedDevice()||undefined})});
+    $('device-status').textContent='playlist started!!';await playback();if(!$('queue-panel').hidden)await refreshQueue();
+  }catch(error){$('device-status').textContent='could not start that playlist: '+error.message;}
+  finally{button.disabled=!spotifyPlaylists.length;}
+}
+async function playQueueItem(uri){
+  $('queue-status').textContent='jumping to that song…';
+  try{
+    await api('/api/spotify/player/play',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({uris:[uri],device_id:selectedDevice()||undefined})});
+    await playback();await refreshQueue();
+  }catch(error){$('queue-status').textContent='could not play that queue item: '+error.message;}
+}
+async function refreshQueue(){
+  if(queueRefreshInFlight)return;queueRefreshInFlight=true;$('queue-status').textContent='fetching the queue…';
+  try{
+    const data=await api('/api/spotify/queue'),list=$('queue-list');list.replaceChildren();
+    if(data.current)list.append(renderQueueItem(data.current,true));
+    (data.queue||[]).forEach(item=>list.append(renderQueueItem(item,false)));
+    $('queue-status').textContent=(data.queue||[]).length+' upcoming item(s). click one to play it now.';
+    if(!data.current&&!(data.queue||[]).length)$('queue-status').textContent='the queue is empty. a clean slate.';
+  }catch(error){$('queue-status').textContent='could not fetch queue: '+error.message;}
+  finally{queueRefreshInFlight=false;}
+}
 async function playerCommand(action, extra={}){
   const deviceId=selectedDevice();
   if(!deviceId && action!=='shuffle'){
@@ -857,6 +910,7 @@ async function playerCommand(action, extra={}){
     }
     $('device-status').textContent='sent!! checking if Spotify listened…';
     await playback();
+    if(!$('queue-panel').hidden)await refreshQueue();
     await loadDevices();
   }catch(error){
     $('device-status').textContent=error.message==='spotify_no_active_device'
@@ -878,7 +932,7 @@ async function connection(){
     $('find-lyrics').hidden = !data.connected;
     $('disconnect').hidden = !data.connected;
     if (!data.connected) { $('connect-controls').hidden=true; clearTrack(); clearLyrics(); say('hi!! connect spotify so i can see what you are playing. i promise to be normal about it'); stopPolling(); }
-    else { say('WE ARE IN'+(data.user?.displayName ? ' as '+data.user.displayName : '')+'!! checking what is playing…'); await loadDevices(); await playback(); startPolling(); }
+    else { say('WE ARE IN'+(data.user?.displayName ? ' as '+data.user.displayName : '')+'!! checking what is playing…'); await loadDevices(); await loadPlaylists(); await playback(); startPolling(); }
   } catch(e){ say('uh oh. connection check failed: '+e.message+'\nthe Worker™ may be having a moment.'); }
 }
 async function playback(){
@@ -1042,9 +1096,23 @@ updateRendererToggle();
 $('connect').onclick=()=>location.href='/auth/login';
 $('check').onclick=playback;
 $('refresh-devices').onclick=loadDevices;
+$('refresh-playlists').onclick=loadPlaylists;
+$('play-playlist').onclick=playSelectedPlaylist;
+$('queue-refresh').onclick=refreshQueue;
+$('queue-toggle').onclick=async()=>{
+  const panel=$('queue-panel');panel.hidden=!panel.hidden;
+  $('queue-toggle').setAttribute('aria-expanded',String(!panel.hidden));
+  $('queue-toggle').textContent=panel.hidden?'show queue':'hide queue';
+  if(!panel.hidden)await refreshQueue();
+};
 $('spotify-device').onchange=()=>{selectedDeviceId=$('spotify-device').value;const device=availableDevices.find(item=>item.id===selectedDeviceId);if(device)$('device-status').textContent='Selected '+device.name+'.';};
 $('play-pause').onclick=()=>playerCommand(isPlaying?'pause':'play');
-$('previous-track').onclick=()=>playerCommand('previous');
+$('previous-track').onclick=async()=>{
+  if(currentPlaybackSeconds()>3){
+    try{await api('/api/spotify/player/seek',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({position_ms:0,device_id:selectedDevice()||undefined})});latestProgressMs=0;progressObservedAt=Date.now();renderProgress();await playback();}
+    catch(error){$('device-status').textContent='could not restart this song: '+error.message;}
+  }else playerCommand('previous');
+};
 $('next-track').onclick=()=>playerCommand('next');
 $('shuffle-toggle').onclick=()=>playerCommand('shuffle',{state:!shuffleEnabled});
 $('repeat-toggle').onclick=()=>{const next=repeatState==='off'?'context':repeatState==='context'?'track':'off';playerCommand('repeat',{state:next});};
