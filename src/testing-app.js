@@ -2,6 +2,8 @@ import '@fontsource-variable/inter';
 import Hls from 'hls.js';
 // Keep the verified app.js fix on a fresh commit so CI can run again.
 import { SpicyLyricsRenderer } from './renderer/spicy/SpicyLyricsRenderer.ts';
+import { OriginalSpicyLyricsEngine } from './renderer/spicy/OriginalSpicyLyricsEngine.ts';
+import './renderer/spicy/original/css/Lyrics/Mixed.css';
 
 const $ = id => document.getElementById(id);
 let poller = null;
@@ -11,9 +13,11 @@ let lyricRequestId = 0;
 let lyricLines = [];
 let lyricsAreSynced = false;
 let amllPlayer = new SpicyLyricsRenderer();
+let originalSpicyEngine = new OriginalSpicyLyricsEngine($('lyrics'));
 let lastFrameTime = null;
 const lyricHost = $('lyrics');
 lyricHost.appendChild(amllPlayer.getElement());
+amllPlayer.getElement().hidden = true;
 amllPlayer.setOptimizeOptions({
   normalizeSpaces: false,
   resetLineTimestamps: false,
@@ -390,6 +394,8 @@ async function api(path, options={}) {
 function clearTrack(){ $('track').hidden=true; $('nowbar').hidden=true; $('cover').style.display='none'; }
 function clearLyrics(){
   lyricLines=[];
+  amllPlayer.getElement().hidden = true;
+  originalSpicyEngine.clear();
   if(amllPlayer){
     amllPlayer.setLyricLines([]);
     amllPlayer.setCurrentTime(0, true);
@@ -472,15 +478,14 @@ function renderSpicyLyrics(data){
   const body=data.spicyLyrics||{};
   const content=Array.isArray(body.Content)?body.Content:[];
   lyricLines=content.flatMap(entry=>{
+    if(body.Type==='Line'){
+      const text=typeof entry?.Text==='string'?entry.Text:'';
+      return text.trim()? [{time:Number.isFinite(entry.StartTime)?entry.StartTime:0,text,words:[],isBG:false,isDuet:entry.OppositeAligned===true}]:[];
+    }
     const lead=spicyVocalWords(entry?.Lead,entry?.StartTime??body.StartTime??0);
     const lines=[];
-    // Spicy Lyrics marks opposite-side duet vocals explicitly. AMLL's
-    // isDuet flag applies the opposite/right-side lyric alignment.
     const oppositeAligned=entry?.OppositeAligned===true;
     if(lead.text.trim()) lines.push({...lead,isBG:false,isDuet:oppositeAligned});
-    // Spicy Lyrics exposes backing vocals as a separate Background[] array.
-    // Keep each backing part as its own AMLL line instead of flattening it
-    // into the lead vocal (which loses the background-vocal styling).
     const backgrounds=Array.isArray(entry?.Background)?entry.Background:[];
     for(const vocal of backgrounds){
       const background=spicyVocalWords(vocal,entry?.StartTime??lead.time);
@@ -489,9 +494,10 @@ function renderSpicyLyrics(data){
     return lines;
   }).sort((a,b)=>a.time-b.time);
   setAttribution(body.source,body.UploadAttribution);
-  if(!lyricLines.length){
-    $('lyrics-meta').textContent='Spicy Lyrics returned a response, but it contained no renderable lyric lines.';
-    amllPlayer.setLyricLines([]);
+  const applied = originalSpicyEngine.apply(body);
+  originalSpicyEngine.setPosition(Math.round(currentPlaybackSeconds()*1000));
+  if (!applied) {
+    $('lyrics-meta').textContent='the original Spicy Lyrics renderer could not apply this payload. check the response type and content.';
     return;
   }
   const hasSyllableTiming=lyricLines.some(line=>line.words.some(word=>word.time!==null&&word.endTime!==null));
@@ -499,8 +505,9 @@ function renderSpicyLyrics(data){
     ? 'we did it evergbkdy. the lyrics are SYLLABLE SYNCed. three cheers for tecknologi!!.'
     : body.Type==='Line'
       ? 'i guess this works idk. its like spotify but best we got for this song'
-      : 'vat ze fuck is zhis bro. regular lyriks? i asked for ze FANCI lyriks';
-  loadIntoAMLL();
+      : body.Type==='Static'
+        ? 'vat ze fuck is zhis bro. regular lyriks? i asked for ze FANCI lyriks'
+        : 'Spicy Lyrics loaded. technology!!';
 }
 function timeSeconds(value){
   if(!value) return null;
@@ -616,6 +623,7 @@ function renderLyrics(data){
   loadIntoAMLL();
 }
 function loadIntoAMLL(){
+  amllPlayer.getElement().hidden = false;
   const amllLines=lyricLines.map((line,index)=>{
     const nextLineTime=lyricLines[index+1]?.time;
     const lineStart=Math.round((line.time||0)*1000);
@@ -810,6 +818,7 @@ async function playback(){
     if(['off','context','track'].includes(data.repeatState)){repeatState=data.repeatState;$('repeat-toggle').setAttribute('aria-pressed',String(repeatState!=='off'));$('repeat-toggle').setAttribute('aria-label','Repeat '+repeatState);$('repeat-toggle').title='Repeat '+repeatState;}
     renderProgress();
     isPlaying=!!data.playing;
+    originalSpicyEngine.setPosition(Math.round(latestProgressMs));
     if(amllPlayer){
       amllPlayer.setCurrentTime(Math.round(latestProgressMs),true);
       if(isPlaying) amllPlayer.resume(); else amllPlayer.pause();
@@ -922,6 +931,7 @@ $('refresh-fancy-background').onclick=async()=>{
 };
 $('disconnect').onclick=async()=>{stopPolling();try{await api('/auth/logout',{method:'POST'});clearTrack();clearLyrics();$('connection').textContent='not connected';$('connect').hidden=false;$('find-lyrics').hidden=true;$('disconnect').hidden=true;say('okay bye Spotify. see you later i guess.')}catch(e){say('Spotify would not let me leave. '+e.message)}};
 function animateAMLL(frameTime){
+  originalSpicyEngine.setPosition(Math.round(currentPlaybackSeconds()*1000));
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
   lastFrameTime=frameTime;
   if(amllPlayer){

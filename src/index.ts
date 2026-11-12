@@ -166,7 +166,24 @@ async function handle(request: Request, env: Env): Promise<Response> {
       },
       body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: env.SPOTIFY_REDIRECT_URI }),
     });
-    if (!tokenResponse.ok) return Response.redirect(appUrl(env) + "?spotify_error=token_exchange_failed", 302);
+    if (!tokenResponse.ok) {
+      let upstreamError: { error?: string; error_description?: string } = {};
+      try { upstreamError = await tokenResponse.json() as typeof upstreamError; } catch { /* ignore non-JSON responses */ }
+      // Log only Spotify's non-secret error code and HTTP status. Never log the
+      // authorization code, client secret, tokens, or the full response body.
+      console.warn("Spotify token exchange failed", {
+        status: tokenResponse.status,
+        error: upstreamError.error || "unknown",
+        hasClientId: !!env.CLIENT_ID,
+        hasClientSecret: !!env.CLIENT_SECRET,
+        hasRedirectUri: !!env.SPOTIFY_REDIRECT_URI,
+      });
+      const failure = new URL(appUrl(env));
+      failure.searchParams.set("spotify_error", "token_exchange_failed");
+      failure.searchParams.set("spotify_reason", upstreamError.error || "unknown");
+      failure.searchParams.set("spotify_status", String(tokenResponse.status));
+      return Response.redirect(failure.toString(), 302);
+    }
     const token = await tokenResponse.json() as TokenResponse;
     if (!token.refresh_token) return Response.redirect(appUrl(env) + "?spotify_error=missing_refresh_token", 302);
     const meResponse = await fetch(API_URL + "/me", { headers: { authorization: "Bearer " + token.access_token } });
@@ -641,7 +658,26 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try { return await handle(request, env); }
     catch (error) {
-      console.error("Unhandled request error", error instanceof Error ? error.message : "unknown");
+      const path = new URL(request.url).pathname;
+      const diagnostic = {
+        path,
+        method: request.method,
+        name: error instanceof Error ? error.name : "UnknownError",
+        // Error messages are capped and request query parameters are never logged.
+        message: error instanceof Error ? error.message.slice(0, 240) : "Unknown error",
+      };
+      console.error("Unhandled request error", diagnostic);
+      // Temporarily expose a bounded diagnostic only on the OAuth callback so
+      // callback failures can be debugged without relying on Observability.
+      if (path === "/auth/callback") {
+        return json({
+          error: "internal_error",
+          diagnostic: {
+            name: diagnostic.name,
+            message: diagnostic.message,
+          },
+        }, 500);
+      }
       return json({ error: "internal_error" }, 500);
     }
   },

@@ -26,5 +26,25 @@
     "APP_ORIGIN": "https://lyricthing.melodii7785.workers.dev",
     "CLIENT_ID": "2298bfff363944bfa2b6818eb5f7a2cf",
     "SPOTIFY_REDIRECT_URI": "https://lyricthing.melodii7785.workers.dev/auth/callback"
+  },
+  "previews": {
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "lyric-thing-preview",
+        "database_id": "44ff56db-57ec-4cd6-87c3-ac0476e396bc"
+      }
+    ],
+    "kv_namespaces": [
+      {
+        "binding": "OAUTH_STATE",
+        "id": "34f693f11325478f93282b4ee2d2234a"
+      }
+    ],
+    "vars": {
+      "APP_ORIGIN": "https://port-original-spicy-lyrics-engine-lyricthing.melodii7785.workers.dev",
+      "CLIENT_ID": "14608b3522cd4b47acf6156537e93f2a",
+      "SPOTIFY_REDIRECT_URI": "https://port-original-spicy-lyrics-engine-lyricthing.melodii7785.workers.dev/auth/callback"
+    }
   }
 }

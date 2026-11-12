@@ -1,19 +1,11 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "Bundler",
-    "lib": [
-      "ES2022",
-      "DOM"
-    ],
-    "types": [
-      "@cloudflare/workers-types"
-    ],
-    "strict": true,
-    "noEmit": true
-  },
-  "include": [
-    "src/**/*.ts"
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.worker.json"
+    },
+    {
+      "path": "./tsconfig.browser.json"
+    }
   ]
 }
