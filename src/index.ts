@@ -143,7 +143,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     authorize.search = new URLSearchParams({
       response_type: "code", client_id: env.CLIENT_ID,
       redirect_uri: env.SPOTIFY_REDIRECT_URI,
-      scope: "user-read-playback-state user-read-currently-playing user-modify-playback-state", state,
+      scope: "user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state", state,
     }).toString();
     return Response.redirect(authorize.toString(), 302);
   }
@@ -187,7 +187,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const token = await tokenResponse.json() as TokenResponse;
     if (!token.refresh_token) return Response.redirect(appUrl(env) + "?spotify_error=missing_refresh_token", 302);
     const meResponse = await fetch(API_URL + "/me", { headers: { authorization: "Bearer " + token.access_token } });
-    if (!meResponse.ok) return Response.redirect(appUrl(env) + "?spotify_error=profile_lookup_failed", 302);
+    if (!meResponse.ok) {
+      const diagnostics = spotifyUpstreamDiagnostics("/me", meResponse);
+      const failure = new URL(appUrl(env));
+      failure.searchParams.set("spotify_error", "profile_lookup_failed");
+      failure.searchParams.set("spotify_status", String(diagnostics.upstreamStatus));
+      if (diagnostics.upstreamRequestId) failure.searchParams.set("spotify_request_id", diagnostics.upstreamRequestId);
+      return Response.redirect(failure.toString(), 302);
+    }
     const me = await meResponse.json() as { id: string; display_name?: string | null };
     const now = Math.floor(Date.now() / 1000);
     await env.DB.prepare(`
