@@ -45,7 +45,7 @@ function applyLyricsZoom(){
 }
 
 const APPEARANCE_KEY = 'lyricthing.originalAppearance';
-const APPEARANCE_DEFAULTS = { font: 'sf', simple: false, blur: true, animations: true, seekFadeCompensation: true, joinSplitWords: false, smoothScrolling: true, highlightOnHover: true };
+const APPEARANCE_DEFAULTS = { font: 'sf', simple: false, blur: true, animations: true, seekFadeCompensation: true, joinSplitWords: false, smoothScrolling: true, highlightOnHover: true, duetLinePadding: false };
 function readAppearance(){
   try { return { ...APPEARANCE_DEFAULTS, ...JSON.parse(localStorage.getItem(APPEARANCE_KEY)||'{}') }; }
   catch { return { ...APPEARANCE_DEFAULTS }; }
@@ -58,6 +58,7 @@ function applyOriginalAppearance(){
   page.classList.toggle('SimpleLyricsMode', appearance.simple);
   page.classList.toggle('NoAnimations', !appearance.animations);
   page.classList.toggle('NoLineHoverBackground', !appearance.highlightOnHover);
+  page.classList.toggle('DuetLinePadding', appearance.duetLinePadding);
   page.querySelector('.LyricsContent')?.classList.toggle('HideLineBlur', !appearance.blur);
   $simpleLyricsMode.set(appearance.simple);
 }
@@ -70,6 +71,7 @@ function syncAppearanceControls(){
   $('appearance-join-words').checked = appearance.joinSplitWords;
   $('appearance-smooth-scroll').checked = appearance.smoothScrolling;
   $('appearance-hover-highlight').checked = appearance.highlightOnHover;
+  $('appearance-duet-padding').checked = appearance.duetLinePadding;
 }
 function saveAppearance(){
   try { localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearance)); }
@@ -1243,6 +1245,7 @@ $('appearance-seek-fade').addEventListener('change',()=>{appearance.seekFadeComp
 $('appearance-join-words').addEventListener('change',()=>{appearance.joinSplitWords=$('appearance-join-words').checked;$joinSplitWords.set(appearance.joinSplitWords);saveAppearance();if(currentSpicyLyricsData&&lyricRendererMode==='port')renderSpicyLyricsWithSelectedRenderer();});
 $('appearance-smooth-scroll').addEventListener('change',()=>{appearance.smoothScrolling=$('appearance-smooth-scroll').checked;$smoothScrolling.set(appearance.smoothScrolling);saveAppearance();});
 $('appearance-hover-highlight').addEventListener('change',()=>{appearance.highlightOnHover=$('appearance-hover-highlight').checked;saveAppearance();});
+$('appearance-duet-padding').addEventListener('change',()=>{appearance.duetLinePadding=$('appearance-duet-padding').checked;saveAppearance();});
 $joinSplitWords.set(appearance.joinSplitWords);
 $smoothScrolling.set(appearance.smoothScrolling);
 syncAppearanceControls();
