@@ -1,13 +1,16 @@
-function openProfile(userId: string | undefined): void {
-  if (!userId) return;
-  const url = `https://spicylyrics.org/uid/${encodeURIComponent(userId)}`;
-  globalThis.open?.(url, "_blank", "noopener,noreferrer");
+function openProfile(url: string | undefined, userId: string | undefined): void {
+  const profileUrl = typeof url === "string" && url.startsWith("https://")
+    ? url
+    : userId
+      ? `https://spicylyrics.org/uid/${encodeURIComponent(userId)}`
+      : undefined;
+  if (profileUrl) globalThis.open?.(profileUrl, "_blank", "noopener,noreferrer");
 }
 
 export function ApplyIsByCommunity(data: any, LyricsContainer: HTMLElement): void {
-  if (!data || data.source !== "spl" || !LyricsContainer) return;
+  if (!data || data.source !== "spicy_lyrics" || !LyricsContainer) return;
 
-  const metadata = data.TTMLUploadMetadata;
+  const metadata = data.UploadAttribution;
   if (!metadata || typeof metadata !== "object") return;
 
   const songInfoElement = document.createElement("div");
@@ -61,7 +64,7 @@ export function ApplyIsByCommunity(data: any, LyricsContainer: HTMLElement): voi
     profileButton.addEventListener("keydown", event => {
       if (event.key === " " || event.key === "Enter") event.stopPropagation();
     });
-    profileButton.addEventListener("click", () => openProfile(person.id));
+    profileButton.addEventListener("click", () => openProfile(person.url, person.id));
   };
 
   if (makerUsername) createProfileSection("Maker", "Made by");
