@@ -1354,3 +1354,27 @@
     padding-bottom: 5vh !important;
   }
 }
+
+
+/* Appearance settings for the original renderer. */
+.appearance-settings{margin:14px 0 18px;border:1px solid #444;background:#171717;color:var(--text)}
+.appearance-settings summary{padding:10px 12px;cursor:pointer;font-weight:750;color:#eee}
+.appearance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;padding:12px;border-top:1px solid #333}
+.appearance-field{display:grid;gap:6px;color:var(--muted);font-size:.82rem;font-weight:700}
+.appearance-field select{min-height:40px;padding:8px;background:#222;color:#eee;border:1px solid #555;font:inherit}
+.appearance-check{display:flex;align-items:center;gap:8px;color:#ddd;font-size:.86rem}
+.appearance-check input{accent-color:var(--accent);width:17px;height:17px}
+.appearance-zoom{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:0 12px 12px}
+.appearance-zoom span{color:var(--muted);font-size:.82rem;margin-right:4px}
+.appearance-zoom button{min-height:36px;padding:6px 12px}
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="sf"] .LyricsContent .line:not(.bg-line),
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="sf"] .LyricsContent .line:not(.bg-line) * {font-family:"SF Pro Display","Roboto Flex",Arial,sans-serif!important}
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="roboto"] .LyricsContent .line:not(.bg-line),
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="roboto"] .LyricsContent .line:not(.bg-line) * {font-family:"Roboto Flex",Arial,sans-serif!important}
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="system"] .LyricsContent .line:not(.bg-line),
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="system"] .LyricsContent .line:not(.bg-line) * {font-family:system-ui,sans-serif!important}
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="arial"] .LyricsContent .line:not(.bg-line),
+#SpicyLyricsPage.SpicyRenderer[data-lyric-font="arial"] .LyricsContent .line:not(.bg-line) * {font-family:Arial,sans-serif!important}
+#SpicyLyricsPage.SpicyRenderer.NoAnimations *,
+#SpicyLyricsPage.SpicyRenderer.NoAnimations *::before,
+#SpicyLyricsPage.SpicyRenderer.NoAnimations *::after {animation:none!important;transition:none!important;scroll-behavior:auto!important}
