@@ -862,7 +862,7 @@ async function loadPlaylists(){
   finally{select.disabled=false;button.disabled=!spotifyPlaylists.length;}
 }
 async function playSelectedPlaylist(){
-  const uri=$('playlist-select').value;if(!uri){$('device-status').textContent='you gotta pick a playlist first. i can't read minds.';return;}
+  const uri=$('playlist-select').value;if(!uri){$("device-status").textContent="you gotta pick a playlist first. i can't read minds.";return;}
   const button=$('play-playlist');button.disabled=true;$('device-status').textContent='putting your playlist on. one moment…';
   try{
     await api('/api/spotify/player/play',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({context_uri:uri,device_id:selectedDevice()||undefined})});
