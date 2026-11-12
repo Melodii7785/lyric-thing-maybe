@@ -716,13 +716,15 @@ function parseTtml(value){
     for(let ancestor=p.parentElement;ancestor;ancestor=ancestor.parentElement) ancestorTimes.push(timeSeconds(ancestor.getAttribute('begin'))??0);
     const ancestorOffset=ancestorTimes.reverse().reduce((total,value)=>total+value,0);
     const lineTime=ancestorOffset+(timeSeconds(p.getAttribute('begin'))??0);
+    const explicitEnd=timeSeconds(p.getAttribute('end'));
+    const lineEnd=explicitEnd===null?null:ancestorOffset+explicitEnd;
     const agent=p.getAttributeNS(ttmNamespace,'agent')||p.getAttribute('ttm:agent')||null;
     const isDuet=hasMultipleSingers && !!agent && agent!==firstAgent;
     const directChildren=Array.from(p.childNodes);
     const mainWords=parseWords(directChildren,lineTime);
     const mainText=mainWords.map(word=>word.text).join('').trim();
     if(mainText){
-      parsed.push({time:lineTime,text:mainText,words:mainWords,isBG:false,isDuet});
+      parsed.push({time:lineTime,endTime:lineEnd,text:mainText,words:mainWords,isBG:false,isDuet});
     }
     const backgrounds=[];
     const collectBackgrounds=node=>{
@@ -738,7 +740,7 @@ function parseTtml(value){
       const text=words.map(word=>word.text).join('').trim();
       if(!text) continue;
       const bgTime=words.find(word=>word.time!==null)?.time??lineTime;
-      parsed.push({time:bgTime,text,words,isBG:true,isDuet:false});
+      parsed.push({time:bgTime,endTime:lineEnd,text,words,isBG:true,isDuet:false});
     }
   }
   return parsed.sort((a,b)=>a.time-b.time);
@@ -750,19 +752,37 @@ function ttmlToSpicyPayload(lines){
     return {Type:'Static',StartTime:0,Lines:lines.map(line=>({Text:line.text}))};
   }
   if(!hasWordTiming){
-    const mainLines=lines.filter(line=>!line.isBG);
+    const mainLines=lines.filter(line=>!line.isBG).sort((a,b)=>a.time-b.time);
+    const lineEnds=new Map();
+    mainLines.forEach((line,index)=>{
+      const nextStart=mainLines[index+1]?.time;
+      const inferredEnd=Number.isFinite(nextStart)
+        ? nextStart
+        : Math.max(line.time+3,...line.words.map(word=>Number.isFinite(word.endTime)?word.endTime:0));
+      const explicitEnd=Number.isFinite(line.endTime)&&line.endTime>line.time
+        ? line.endTime
+        : inferredEnd;
+      lineEnds.set(line,Number.isFinite(nextStart)
+        ? Math.min(explicitEnd,nextStart)
+        : explicitEnd);
+    });
+    const content=lines.map(line=>{
+      const nextMain=mainLines.find(main=>main.time>line.time);
+      const inferredEnd=nextMain?.time ??
+        Math.max(line.time+3,...line.words.map(word=>Number.isFinite(word.endTime)?word.endTime:0));
+      const endTime=Number.isFinite(line.endTime)&&line.endTime>line.time
+        ? Math.min(line.endTime,inferredEnd)
+        : inferredEnd;
+      return {
+        Text:line.text,
+        StartTime:line.time,
+        EndTime:Math.max(line.time+0.1,line.isBG?endTime:(lineEnds.get(line)??endTime))
+      };
+    }).sort((a,b)=>a.StartTime-b.StartTime);
     return {
       Type:'Line',
       StartTime:mainLines[0]?.time||0,
-      Content:lines.map((line,index)=>{
-        const nextStart=mainLines[index+1]?.time;
-        const wordEnd=Math.max(0,...line.words.map(word=>Number.isFinite(word.endTime)?word.endTime:0));
-        return {
-          Text:line.text,
-          StartTime:line.time,
-          EndTime:Math.max(line.time+0.1,wordEnd,nextStart||0)
-        };
-      })
+      Content:content
     };
   }
 
