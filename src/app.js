@@ -878,14 +878,14 @@ async function playQueueItem(uri){
   }catch(error){$('queue-status').textContent='could not play that song. spotify said no. ('+error.message+')';}
 }
 async function refreshQueue(){
-  if(queueRefreshInFlight)return;queueRefreshInFlight=true;$('queue-status').textContent='asking spotify what's next…';
+  if(queueRefreshInFlight)return;queueRefreshInFlight=true;$('queue-status').textContent="asking spotify what's next…";
   try{
     const data=await api('/api/spotify/queue'),list=$('queue-list');list.replaceChildren();
     if(data.current)list.append(renderQueueItem(data.current,true));
     (data.queue||[]).forEach(item=>list.append(renderQueueItem(item,false)));
     $('queue-status').textContent=(data.queue||[]).length+' thing(s) coming up. click one to play it right now!!';
     if(!data.current&&!(data.queue||[]).length)$('queue-status').textContent='nothing in the queue. the future is unwritten.';
-  }catch(error){$('queue-status').textContent='the queue wouldn't load. spotify is being difficult: '+error.message;}
+  }catch(error){$('queue-status').textContent="the queue wouldn't load. spotify is being difficult: "+error.message;}
   finally{queueRefreshInFlight=false;}
 }
 async function playerCommand(action, extra={}){
