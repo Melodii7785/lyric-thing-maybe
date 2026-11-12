@@ -54,7 +54,18 @@ export class OriginalSpicyLyricsEngine {
   }
 
   apply(payload: AnyRecord) {
-    const body: AnyRecord = payload?.spicyLyrics ?? payload ?? {};
+    const nestedBody: AnyRecord = payload?.spicyLyrics ?? payload?.Body ?? payload ?? {};
+    // API responses can carry source metadata beside the lyric payload.
+    // Merge it into the body before passing it to the original applyers.
+    const body: AnyRecord = payload?.spicyLyrics || payload?.Body
+      ? {
+          ...nestedBody,
+          source: nestedBody.source ?? payload.source,
+          source_via: nestedBody.source_via ?? payload.source_via,
+          UploadAttribution: nestedBody.UploadAttribution ?? payload.UploadAttribution,
+          SongWriters: nestedBody.SongWriters ?? payload.SongWriters,
+        }
+      : nestedBody;
     const type = String(body.Type ?? "Static");
     const content: AnyRecord[] = Array.isArray(body.Content) ? body.Content : [];
 
