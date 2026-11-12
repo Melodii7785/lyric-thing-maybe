@@ -259,16 +259,16 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
     <p class="muted" id="device-status">pick a device. i cannot read minds. yet.</p>
     <div class="library-controls">
       <label for="playlist-select">this ain't it? okay freak, play a playlist of yours.</label>
-      <select id="playlist-select"><option value="">loading your playlists…</option></select>
-      <button class="secondary" id="refresh-playlists" type="button">refresh playlists</button>
-      <button id="play-playlist" type="button" disabled>play this playlist</button>
+      <select id="playlist-select"><option value="">fetching your playlists. hold on…</option></select>
+      <button class="secondary" id="refresh-playlists" type="button">look at my playlists again</button>
+      <button id="play-playlist" type="button" disabled>yes. play THIS one.</button>
     </div>
     <div class="queue-tools">
-      <button class="secondary" id="queue-toggle" type="button" aria-expanded="false">show queue</button>
-      <button class="secondary" id="queue-refresh" type="button">refresh queue</button>
+      <button class="secondary" id="queue-toggle" type="button" aria-expanded="false">what's coming up?</button>
+      <button class="secondary" id="queue-refresh" type="button">refresh the queue</button>
     </div>
-    <section id="queue-panel" hidden aria-label="Spotify playback queue">
-      <p class="muted" id="queue-status">the queue is hiding. fetching…</p>
+    <section id="queue-panel" hidden aria-label="what Spotify is playing next">
+      <p class="muted" id="queue-status">the queue is being mysterious. one sec…</p>
       <ol id="queue-list"></ol>
     </section>
   </div>
