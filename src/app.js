@@ -725,14 +725,14 @@ function ttmlToSpicyPayload(lines){
   const hasWordTiming=lines.some(line=>line.words.some(word=>Number.isFinite(word.time)));
   const hasLineTiming=lines.some(line=>line.time>0);
   if(!hasWordTiming && !hasLineTiming){
-    return {Type:'Static',StartTime:0,Lines:lines.filter(line=>!line.isBG).map(line=>({Text:line.text}))};
+    return {Type:'Static',StartTime:0,Lines:lines.map(line=>({Text:line.text}))};
   }
   if(!hasWordTiming){
     const mainLines=lines.filter(line=>!line.isBG);
     return {
       Type:'Line',
       StartTime:mainLines[0]?.time||0,
-      Content:mainLines.map((line,index)=>{
+      Content:lines.map((line,index)=>{
         const nextStart=mainLines[index+1]?.time;
         const wordEnd=Math.max(0,...line.words.map(word=>Number.isFinite(word.endTime)?word.endTime:0));
         return {
@@ -746,24 +746,24 @@ function ttmlToSpicyPayload(lines){
 
   const mainLines=lines.filter(line=>!line.isBG);
   const backgroundLines=lines.filter(line=>line.isBG);
+  const toSyllables=(words,lineStart,lineEnd)=>words.map((word,wordIndex)=>{
+    const nextWordStart=words.slice(wordIndex+1).find(next=>Number.isFinite(next.time))?.time;
+    const start=Number.isFinite(word.time)?word.time:lineStart;
+    const end=Number.isFinite(word.endTime)?word.endTime:
+      Number.isFinite(nextWordStart)?nextWordStart:Math.max(start+0.1,lineEnd);
+    return {
+      Text:word.text,
+      StartTime:start,
+      EndTime:Math.max(start+0.01,end),
+      IsPartOfWord:word.isPartOfWord===true
+    };
+  });
   const content=mainLines.map((line,index)=>{
     const nextStart=mainLines[index+1]?.time??Infinity;
     const endTime=Math.max(
       line.time+0.1,
       ...line.words.map(word=>Number.isFinite(word.endTime)?word.endTime:0)
     );
-    const toSyllables=(words,lineStart,lineEnd)=>words.map((word,wordIndex)=>{
-      const nextWordStart=words.slice(wordIndex+1).find(next=>Number.isFinite(next.time))?.time;
-      const start=Number.isFinite(word.time)?word.time:lineStart;
-      const end=Number.isFinite(word.endTime)?word.endTime:
-        Number.isFinite(nextWordStart)?nextWordStart:Math.max(start+0.1,lineEnd);
-      return {
-        Text:word.text,
-        StartTime:start,
-        EndTime:Math.max(start+0.01,end),
-        IsPartOfWord:word.isPartOfWord===true
-      };
-    });
     const backgrounds=backgroundLines
       .filter(bg=>bg.time>=line.time && bg.time<nextStart)
       .map(bg=>{
