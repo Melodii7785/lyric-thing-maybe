@@ -1326,3 +1326,12 @@
     --DefaultLyricsSize: clamp(2.8rem, 3.6vw, 4.5rem);
   }
 }
+
+/* Restore the app's SF Pro Display typography for the original renderer. */
+#SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line:not(.bg-line),
+#SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .line:not(.bg-line) *,
+#SpicyLyricsPage.SpicyRenderer .LyricsContainer .LyricsContent .SongCredits {
+  font-family: "SF Pro Display", "Roboto Flex", Arial, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
