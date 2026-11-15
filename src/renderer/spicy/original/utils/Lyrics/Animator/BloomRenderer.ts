@@ -106,6 +106,8 @@ function applySyllableLine(line: any, position: number, motionEnabled: boolean) 
     const value = gradientPosition(edge, item.x, item.width, fade).toFixed(2) + "%";
     setStyle(item.word.HTMLElement, "--gradient-position", value);
     setStyle(item.word.HTMLElement, "--gradient-alpha", item.word.BGWord ? "0.35" : "0.94");
+    setStyle(item.word.HTMLElement, "scale", "1");
+    setStyle(item.word.HTMLElement, "text-shadow", "none");
     const wordLift = !motionEnabled ? 0 : position < line.EndTime
       ? lift(position - item.word.StartTime)
       : lift(item.word.EndTime - item.word.StartTime) * (1 - lift(position - line.EndTime));
