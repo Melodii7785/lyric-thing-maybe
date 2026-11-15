@@ -45,7 +45,7 @@ function gradientPosition(edge: number, x: number, width: number, fade: number) 
   return clamp(100 - 150 * rest, -50, 100);
 }
 
-function applySyllableLine(line: any, position: number) {
+function applySyllableLine(line: any, position: number, motionEnabled: boolean) {
   const element = line.HTMLElement as HTMLElement;
   const words = line.Syllables?.Lead as SyllableLead[] | undefined;
   if (!words?.length) return;
@@ -106,7 +106,7 @@ function applySyllableLine(line: any, position: number) {
     const value = gradientPosition(edge, item.x, item.width, fade).toFixed(2) + "%";
     setStyle(item.word.HTMLElement, "--gradient-position", value);
     setStyle(item.word.HTMLElement, "--gradient-alpha", item.word.BGWord ? "0.35" : "0.94");
-    const wordLift = position < line.EndTime
+    const wordLift = !motionEnabled ? 0 : position < line.EndTime
       ? lift(position - item.word.StartTime)
       : lift(item.word.EndTime - item.word.StartTime) * (1 - lift(position - line.EndTime));
     setStyle(item.word.HTMLElement, "translate", `0 ${(-LIFT_EM * wordLift).toFixed(4)}em`);
@@ -114,7 +114,7 @@ function applySyllableLine(line: any, position: number) {
     if (item.word.LetterGroup && item.word.Letters) {
       const letters = item.word.Letters;
       const duration = item.word.EndTime - item.word.StartTime;
-      const held = duration >= 1000 && letters.length >= 2 && letters.length <= 7;
+      const held = motionEnabled && duration >= 1000 && letters.length >= 2 && letters.length <= 7;
       const phase = Math.min(duration, 3000);
       const stagger = Math.min(0.4 * duration / Math.max(1, letters.length), 400);
       const holdMs = 2 * duration / Math.max(1, letters.length);
@@ -125,7 +125,7 @@ function applySyllableLine(line: any, position: number) {
         const x = rect.left - lineRect.left;
         const letterProgress = gradientPosition(edge, x, rect.width, fade);
         setStyle(letter.HTMLElement, "--gradient-position", letterProgress.toFixed(2) + "%");
-        const letterLift = position < line.EndTime
+        const letterLift = !motionEnabled ? 0 : position < line.EndTime
           ? lift(position - letter.StartTime)
           : lift(letter.EndTime - letter.StartTime) * (1 - lift(position - line.EndTime));
         setStyle(letter.HTMLElement, "translate", `0 ${(-LIFT_EM * letterLift).toFixed(4)}em`);
@@ -136,7 +136,8 @@ function applySyllableLine(line: any, position: number) {
           const fall = clamp((elapsed - holdMs) / Math.max(1, phase), 0, 1);
           const inEase = 1 - Math.pow(1 - rise, 3);
           const outEase = 1 - Math.pow(1 - fall, 3);
-          const amount = elapsed <= 0 ? 0 : elapsed < holdMs ? inEase : (1 - outEase) * (1 - Math.pow(1 - clamp(holdMs / phase, 0, 1), 3));
+          const heldAmount = 1 - Math.pow(1 - clamp(holdMs / phase, 0, 1), 3);
+          const amount = elapsed <= 0 ? 0 : elapsed < holdMs ? inEase : heldAmount * (1 - outEase);
           const scale = 1 + peak * amount;
           setStyle(letter.HTMLElement, "scale", scale.toFixed(3));
           setStyle(letter.HTMLElement, "text-shadow", `0 0 ${(0.187 * fontSize * amount).toFixed(2)}px rgba(255,255,255,${(0.5 * amount).toFixed(3)})`);
@@ -155,11 +156,12 @@ export function applyBloomAnimation(position: number, type: string) {
       const element = line.HTMLElement;
       if (!element.isConnected) continue;
       const active = position >= line.StartTime && position <= line.EndTime;
-      element.style.scale = active ? "1" : "0.98";
+      const motionEnabled = !element.closest(".SpicyLyricsPage")?.classList.contains("NoAnimations");
+      element.style.scale = !motionEnabled || active ? "1" : "0.98";
       setStyle(element, "--gradient-alpha", "0.94");
       setStyle(element, "--gradient-alpha-end", "0.18");
       if (line.DotLine) continue;
-      applySyllableLine(line, position);
+      applySyllableLine(line, position, motionEnabled);
     }
     return;
   }
@@ -170,7 +172,8 @@ export function applyBloomAnimation(position: number, type: string) {
       if (!element.isConnected) continue;
       const tone = lineTone(position, line.StartTime, line.EndTime);
       const active = position >= line.StartTime && position <= line.EndTime;
-      element.style.scale = active ? "1" : "0.98";
+      const motionEnabled = !element.closest(".SpicyLyricsPage")?.classList.contains("NoAnimations");
+      element.style.scale = !motionEnabled || active ? "1" : "0.98";
       setStyle(element, "--gradient-alpha", (active || position < line.StartTime ? "0.94" : tone.toFixed(3)));
       setStyle(element, "--gradient-alpha-end", (active || position < line.StartTime ? "0.18" : tone.toFixed(3)));
       setStyle(element, "--gradient-position", (
