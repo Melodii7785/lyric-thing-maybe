@@ -1376,3 +1376,53 @@
 #SpicyLyricsPage.SpicyRenderer.NoAnimations *,
 #SpicyLyricsPage.SpicyRenderer.NoAnimations *::before,
 #SpicyLyricsPage.SpicyRenderer.NoAnimations *::after {animation:none!important;transition:none!important;scroll-behavior:auto!important}
+
+
+/* Bloom: one soft fill edge travels through the words of a line. */
+#SpicyLyricsPage.SpicyRenderer.BloomRenderer .LyricsContainer .LyricsContent .line {
+  --gradient-alpha: 0.94;
+  --gradient-alpha-end: 0.18;
+  --gradient-position: -50%;
+  --gradient-offset: 0%;
+  margin-block: 0.4em;
+  transform-origin: left center;
+  transition: scale 350ms cubic-bezier(0.4, 0.1, 0, 1);
+}
+
+#SpicyLyricsPage.SpicyRenderer.BloomRenderer .LyricsContainer .LyricsContent .line.Active {
+  scale: 1;
+}
+
+#SpicyLyricsPage.SpicyRenderer.BloomRenderer .LyricsContainer .LyricsContent .line:not(.Active) {
+  scale: 0.98;
+}
+
+#SpicyLyricsPage.SpicyRenderer.BloomRenderer .LyricsContainer .LyricsContent .line .word:not(.dot),
+#SpicyLyricsPage.SpicyRenderer.BloomRenderer .LyricsContainer .LyricsContent .line .letter {
+  --gradient-alpha: 0.94;
+  --gradient-alpha-end: 0.18;
+  --gradient-position: -50%;
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, var(--gradient-alpha)) var(--gradient-position),
+    rgba(255, 255, 255, var(--gradient-alpha-end)) calc(var(--gradient-position) + 20%)
+  ) !important;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+#SpicyLyricsPage.SpicyRenderer.BloomRenderer .LyricsContainer .LyricsContent .line .word,
+#SpicyLyricsPage.SpicyRenderer.BloomRenderer .LyricsContainer .LyricsContent .line .letter {
+  transition: none;
+  will-change: translate, background-position;
+}
+
+#SpicyLyricsPage.SpicyRenderer.BloomRenderer .LyricsContainer .LyricsContent .line .word.dot {
+  --gradient-alpha: 0.94;
+  --gradient-alpha-end: 0.18;
+}
+
+#SpicyLyricsPage.SpicyRenderer.BloomRenderer .LyricsContainer .LyricsContent .line .letter {
+  text-shadow: 0 0 var(--text-shadow-blur-radius, 0px)
+    rgba(255, 255, 255, var(--text-shadow-opacity, 0));
+}
