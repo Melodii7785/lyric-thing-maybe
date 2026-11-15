@@ -108,7 +108,7 @@ function applySyllableLine(line: any, position: number) {
     const wordLift = position < line.EndTime
       ? lift(position - item.word.StartTime)
       : lift(item.word.EndTime - item.word.StartTime) * (1 - lift(position - line.EndTime));
-    item.word.HTMLElement.style.translate = `0 ${(-LIFT_EM * wordLift).toFixed(4)}em`;
+    setStyle(item.word.HTMLElement, "translate", `0 ${(-LIFT_EM * wordLift).toFixed(4)}em`);
 
     if (item.word.LetterGroup && item.word.Letters) {
       for (const letter of item.word.Letters) {
@@ -126,7 +126,7 @@ function applySyllableLine(line: any, position: number) {
         const letterLift = position < line.EndTime
           ? lift(position - letter.StartTime)
           : lift(letter.EndTime - letter.StartTime) * (1 - lift(position - line.EndTime));
-        letter.HTMLElement.style.translate = `0 ${(-LIFT_EM * letterLift).toFixed(4)}em`;
+        setStyle(letter.HTMLElement, "translate", `0 ${(-LIFT_EM * letterLift).toFixed(4)}em`);
       }
     }
   }
@@ -152,9 +152,10 @@ export function applyBloomAnimation(position: number, type: string) {
       const element = line.HTMLElement;
       if (!element.isConnected) continue;
       const tone = lineTone(position, line.StartTime, line.EndTime);
-      element.style.scale = position >= line.StartTime && position <= line.EndTime ? "1" : "0.98";
-      setStyle(element, "--gradient-alpha", tone.toFixed(3));
-      setStyle(element, "--gradient-alpha-end", "0.18");
+      const active = position >= line.StartTime && position <= line.EndTime;
+      element.style.scale = active ? "1" : "0.98";
+      setStyle(element, "--gradient-alpha", (active || position < line.StartTime ? "0.94" : tone.toFixed(3)));
+      setStyle(element, "--gradient-alpha-end", (active || position < line.StartTime ? "0.18" : tone.toFixed(3)));
       setStyle(element, "--gradient-position", (
         position < line.StartTime ? -50 :
         position >= line.EndTime ? 100 :
