@@ -8,7 +8,7 @@ import './renderer/spicy/original/css/Lyrics/Mixed.css';
 import { Animate as animateOriginalSpicyLyrics } from './renderer/spicy/original/utils/Lyrics/Animator/Lyrics/LyricsAnimator.ts';
 import { TimeSetter as setOriginalSpicyLyricsTime } from './renderer/spicy/original/utils/Lyrics/Animator/Lyrics/LyricsSetter.ts';
 import { QueueForceScroll } from './renderer/spicy/original/utils/Scrolling/ScrollToActiveLine.ts';
-import { $simpleLyricsMode, $joinSplitWords, $smoothScrolling } from './renderer/spicy/original/utils/stores.ts';
+import { $bloomMode, $simpleLyricsMode, $joinSplitWords, $smoothScrolling } from './renderer/spicy/original/utils/stores.ts';
 import { LyricsObject } from './renderer/spicy/original/utils/Lyrics/lyrics.ts';
 
 const $ = id => document.getElementById(id);
@@ -45,27 +45,38 @@ function applyLyricsZoom(){
 }
 
 const APPEARANCE_KEY = 'lyricthing.originalAppearance';
-const APPEARANCE_DEFAULTS = { font: 'sf', simple: false, blur: true, animations: true, seekFadeCompensation: true, joinSplitWords: false, smoothScrolling: true, highlightOnHover: true, duetLinePadding: false, creditsFollowLastSinger: false };
+const APPEARANCE_DEFAULTS = { font: 'sf', rendererStyle: 'spring', blur: true, animations: true, seekFadeCompensation: true, joinSplitWords: false, smoothScrolling: true, highlightOnHover: true, duetLinePadding: false, creditsFollowLastSinger: false };
 function readAppearance(){
-  try { return { ...APPEARANCE_DEFAULTS, ...JSON.parse(localStorage.getItem(APPEARANCE_KEY)||'{}') }; }
-  catch { return { ...APPEARANCE_DEFAULTS }; }
+  try {
+    const saved = JSON.parse(localStorage.getItem(APPEARANCE_KEY)||'{}');
+    const legacySimple = saved.simple === true || saved.simpleLyricsMode === true;
+    const rendererStyle = saved.rendererStyle === 'bloom' || saved.rendererStyle === 'spring'
+      ? saved.rendererStyle
+      : legacySimple ? 'bloom' : 'spring';
+    const { simple, simpleLyricsMode, ...current } = saved;
+    return { ...APPEARANCE_DEFAULTS, ...current, rendererStyle };
+  } catch { return { ...APPEARANCE_DEFAULTS }; }
 }
 let appearance = readAppearance();
+$bloomMode.set(appearance.rendererStyle === 'bloom');
+$simpleLyricsMode.set(false);
 function applyOriginalAppearance(){
+  $bloomMode.set(appearance.rendererStyle === 'bloom');
+  $simpleLyricsMode.set(false);
   const page = lyricHost.querySelector('.SpicyLyricsPage');
   if(!page) return;
   page.dataset.lyricFont = appearance.font;
-  page.classList.toggle('SimpleLyricsMode', appearance.simple);
+  page.classList.remove('SimpleLyricsMode');
+  page.classList.toggle('BloomRenderer', appearance.rendererStyle === 'bloom');
   page.classList.toggle('NoAnimations', !appearance.animations);
   page.classList.toggle('NoLineHoverBackground', !appearance.highlightOnHover);
   page.classList.toggle('DuetLinePadding', appearance.duetLinePadding);
   page.classList.toggle('CreditsFollowLastLine', appearance.creditsFollowLastSinger);
   page.querySelector('.LyricsContent')?.classList.toggle('HideLineBlur', !appearance.blur);
-  $simpleLyricsMode.set(appearance.simple);
 }
 function syncAppearanceControls(){
   $('appearance-font').value = appearance.font;
-  $('appearance-simple').checked = appearance.simple;
+  $('appearance-renderer-style').value = appearance.rendererStyle;
   $('appearance-blur').checked = appearance.blur;
   $('appearance-animations').checked = appearance.animations;
   $('appearance-seek-fade').checked = appearance.seekFadeCompensation;
@@ -613,6 +624,8 @@ function renderSpicyLyricsWithSelectedRenderer(){
   if(lyricRendererMode==='port'){
     amllElement.style.display='none';
     try{
+      $bloomMode.set(appearance.rendererStyle === 'bloom');
+      $simpleLyricsMode.set(false);
       const applied=originalSpicyEngine.apply(currentSpicyLyricsData);
       const page=lyricHost.querySelector('.SpicyLyricsPage');
       if(!applied || !page) throw new Error('Original Spicy renderer did not create lyric content.');
@@ -1240,7 +1253,7 @@ function stopPolling(){
 }
 
 $('appearance-font').addEventListener('change',()=>{appearance.font=$('appearance-font').value;saveAppearance();});
-$('appearance-simple').addEventListener('change',()=>{appearance.simple=$('appearance-simple').checked;saveAppearance();});
+$('appearance-renderer-style').addEventListener('change',()=>{appearance.rendererStyle=$('appearance-renderer-style').value;saveAppearance();if(currentSpicyLyricsData&&lyricRendererMode==='port')renderSpicyLyricsWithSelectedRenderer();});
 $('appearance-blur').addEventListener('change',()=>{appearance.blur=$('appearance-blur').checked;saveAppearance();});
 $('appearance-animations').addEventListener('change',()=>{appearance.animations=$('appearance-animations').checked;saveAppearance();});
 $('appearance-seek-fade').addEventListener('change',()=>{appearance.seekFadeCompensation=$('appearance-seek-fade').checked;saveAppearance();});
