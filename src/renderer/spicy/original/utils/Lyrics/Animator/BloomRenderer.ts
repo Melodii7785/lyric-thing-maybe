@@ -1,4 +1,4 @@
-import { LyricsObject, type SyllableLead } from "./lyrics.ts";
+import { LyricsObject, type SyllableLead } from "../lyrics.ts";
 
 const FADE_EM = 0.882;
 const LIFT_EM = 0.0588;
