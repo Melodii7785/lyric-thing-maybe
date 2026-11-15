@@ -59,15 +59,16 @@ function readAppearance(){
 }
 let appearance = readAppearance();
 $bloomMode.set(appearance.rendererStyle === 'bloom');
-$simpleLyricsMode.set(false);
+$simpleLyricsMode.set(appearance.rendererStyle === 'bloom');
 function applyOriginalAppearance(){
   $bloomMode.set(appearance.rendererStyle === 'bloom');
-  $simpleLyricsMode.set(false);
+  $simpleLyricsMode.set(appearance.rendererStyle === 'bloom');
   const page = lyricHost.querySelector('.SpicyLyricsPage');
   if(!page) return;
   page.dataset.lyricFont = appearance.font;
-  page.classList.remove('SimpleLyricsMode');
-  page.classList.toggle('BloomRenderer', appearance.rendererStyle === 'bloom');
+  page.classList.toggle('SimpleLyricsMode', appearance.rendererStyle === 'bloom');
+  page.classList.toggle('Exp_RefreshedSimpleLyrics', appearance.rendererStyle === 'bloom');
+  page.classList.remove('BloomRenderer');
   page.classList.toggle('NoAnimations', !appearance.animations);
   page.classList.toggle('NoLineHoverBackground', !appearance.highlightOnHover);
   page.classList.toggle('DuetLinePadding', appearance.duetLinePadding);
@@ -625,7 +626,7 @@ function renderSpicyLyricsWithSelectedRenderer(){
     amllElement.style.display='none';
     try{
       $bloomMode.set(appearance.rendererStyle === 'bloom');
-      $simpleLyricsMode.set(false);
+      $simpleLyricsMode.set(appearance.rendererStyle === 'bloom');
       const applied=originalSpicyEngine.apply(currentSpicyLyricsData);
       const page=lyricHost.querySelector('.SpicyLyricsPage');
       if(!applied || !page) throw new Error('Original Spicy renderer did not create lyric content.');
