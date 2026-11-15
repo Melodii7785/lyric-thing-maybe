@@ -1,7 +1,8 @@
 // @ts-ignore pkg has no @types on npm
 import Spline from "cubic-spline";
 import { easeSinOut } from "d3-ease";
-import { $currentLyricsType, $simpleLyricsMode } from "../../../../utils/stores.ts";
+import { $bloomMode, $currentLyricsType, $simpleLyricsMode } from "../../../../utils/stores.ts";
+import { applyBloomAnimation } from "../BloomRenderer.ts";
 import {
   LyricsObject,
   SimpleLyricsMode_LetterEffectsStrengthConfig,
@@ -1060,7 +1061,7 @@ function getProgressPercentage(currentTime: number, startTime: number, endTime: 
 let lastAnimateFrameTime = 0;
 
 export function Animate(position: number): void {
-  const ProcessedPosition = position + timeOffset - ($simpleLyricsMode.get() ? 33.5 : 0);
+  const ProcessedPosition = position + timeOffset - ($bloomMode.get() || $simpleLyricsMode.get() ? 33.5 : 0);
   const refreshedSimple =
     $simpleLyricsMode.get() && isExperimentEnabled("refreshedSimpleLyrics");
   // Spline point split letters wait at before they're sung: shrunk and low
@@ -2440,6 +2441,9 @@ export function Animate(position: number): void {
   // Blink re-check the page's ancestors, up to <html>.
   const lyricsContent = mountedLine?.closest<HTMLElement>(".LyricsContent");
   if (lyricsContent) setClass(lyricsContent, "LinesAllSung", !anyLineUnsung);
+
+  // Bloom layers its time-based fill and lift over the shared Spicy lyric elements.
+  if ($bloomMode.get()) applyBloomAnimation(ProcessedPosition, CurrentLyricsType);
 
   // Commit any queued style changes after completing the animation computations
   flushStyleBatch();
