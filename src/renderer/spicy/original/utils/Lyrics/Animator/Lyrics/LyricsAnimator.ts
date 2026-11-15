@@ -2,7 +2,6 @@
 import Spline from "cubic-spline";
 import { easeSinOut } from "d3-ease";
 import { $bloomMode, $currentLyricsType, $simpleLyricsMode } from "../../../../utils/stores.ts";
-import { applyBloomAnimation } from "../BloomRenderer.ts";
 import {
   LyricsObject,
   SimpleLyricsMode_LetterEffectsStrengthConfig,
@@ -1063,7 +1062,7 @@ let lastAnimateFrameTime = 0;
 export function Animate(position: number): void {
   const ProcessedPosition = position + timeOffset - ($bloomMode.get() || $simpleLyricsMode.get() ? 33.5 : 0);
   const refreshedSimple =
-    $simpleLyricsMode.get() && isExperimentEnabled("refreshedSimpleLyrics");
+    ($bloomMode.get() || ($simpleLyricsMode.get() && isExperimentEnabled("refreshedSimpleLyrics")));
   // Spline point split letters wait at before they're sung: shrunk and low
   // normally, plain text under the refreshed wave (which starts from rest).
   const letterRest = refreshedSimple ? 1 : 0;
@@ -2441,9 +2440,6 @@ export function Animate(position: number): void {
   // Blink re-check the page's ancestors, up to <html>.
   const lyricsContent = mountedLine?.closest<HTMLElement>(".LyricsContent");
   if (lyricsContent) setClass(lyricsContent, "LinesAllSung", !anyLineUnsung);
-
-  // Bloom layers its time-based fill and lift over the shared Spicy lyric elements.
-  if ($bloomMode.get()) applyBloomAnimation(ProcessedPosition, CurrentLyricsType);
 
   // Commit any queued style changes after completing the animation computations
   flushStyleBatch();
