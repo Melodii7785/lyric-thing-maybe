@@ -16,7 +16,7 @@ export function atom<T>(initial: T) {
 }
 export const $lyricsContainerExists = atom(true);
 export const $minimalLyricsMode = atom(false);
-export const $simpleLyricsMode = atom(false);
+export const $simpleLyricsMode = atom(false); // Legacy Spring setting; Bloom has its own renderer style.\nexport const $bloomMode = atom(false);
 export const $currentLyricsType = atom<"Syllable" | "Line" | "Static" | "None">("None");
 export const $joinSplitWords = atom(false);
 export const $smoothScrolling = atom(true);
