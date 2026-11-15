@@ -227,7 +227,7 @@ export function ApplySyllableLyrics(data: LyricsData, UseRomanized: boolean = fa
       nextLineStartTime !== 0 ? nextLineStartTime - line.Lead.EndTime : 0;
 
     const lineEndTime =
-      $minimalLyricsMode.get()
+      ($minimalLyricsMode.get() || $bloomMode.get())
         ? nextLineStartTime === 0
           ? line.Lead.EndTime
           : lineEndTimeAndNextLineStartTimeDistance < getLyricsBetweenShow() &&
