@@ -22,7 +22,7 @@ function lift(elapsedMs: number) {
 
 function setStyle(element: HTMLElement, property: string, value: string) {
   if (element.style.getPropertyValue(property) !== value) {
-    element.style.setProperty(property, value);
+    element.style.setProperty(property, value, "important");
   }
 }
 
