@@ -299,7 +299,12 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
             <option value="arial">Arial</option>
           </select>
         </label>
-        <label class="appearance-check"><input id="appearance-simple" type="checkbox"> simple lyrics mode</label>
+        <label class="appearance-field" for="appearance-renderer-style">renderer visual style
+          <select id="appearance-renderer-style">
+            <option value="spring">Spring (default)</option>
+            <option value="bloom">Bloom</option>
+          </select>
+        </label>
         <label class="appearance-check"><input id="appearance-blur" type="checkbox" checked> lyric glow / blur</label>
         <label class="appearance-check"><input id="appearance-animations" type="checkbox" checked> lyric animations</label>
         <label class="appearance-check"><input id="appearance-seek-fade" type="checkbox" checked> compensate for Spotify seek fade-in</label>
