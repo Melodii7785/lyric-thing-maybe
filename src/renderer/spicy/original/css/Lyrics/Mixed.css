@@ -1426,3 +1426,12 @@
   text-shadow: 0 0 var(--text-shadow-blur-radius, 0px)
     rgba(255, 255, 255, var(--text-shadow-opacity, 0));
 }
+
+#SpicyLyricsPage.SpicyRenderer.BloomRenderer .LyricsContainer .LyricsContent
+  .SpicyLyricsScrollContainer[data-lyrics-type="Line"] .line {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, var(--gradient-alpha)) var(--gradient-position),
+    rgba(255, 255, 255, var(--gradient-alpha-end)) calc(var(--gradient-position) + 20%)
+  ) !important;
+}
