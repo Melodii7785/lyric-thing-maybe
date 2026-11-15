@@ -1,4 +1,4 @@
-import { $lyricsContainerExists, $simpleLyricsMode } from "../../../../utils/stores.ts";
+import { $bloomMode, $lyricsContainerExists, $simpleLyricsMode } from "../../../../utils/stores.ts";
 import { PageContainer } from "../../../../components/Pages/PageView.ts";
 import { applyStyles, removeAllStyles } from "../../../CSS/Styles.ts";
 import {
@@ -195,7 +195,7 @@ export function ApplyLineLyrics(data: LyricsData, UseRomanized: boolean = false)
     const lineEndTimeAndNextLineStartTimeDistance =
       nextLineStartTime !== 0 ? nextLineStartTime - line.EndTime : 0;
 
-    const lineEndTime = $simpleLyricsMode.get()
+    const lineEndTime = ($simpleLyricsMode.get() || $bloomMode.get())
       ? nextLineStartTime === 0
         ? line.EndTime
         : lineEndTimeAndNextLineStartTimeDistance < getLyricsBetweenShow() &&
