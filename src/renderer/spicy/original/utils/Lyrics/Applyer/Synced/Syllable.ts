@@ -1,4 +1,5 @@
 import {
+  $bloomMode,
   $joinSplitWords,
   $lyricsContainerExists,
   $minimalLyricsMode,
