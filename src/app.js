@@ -10,6 +10,8 @@ import { TimeSetter as setOriginalSpicyLyricsTime } from './renderer/spicy/origi
 import { QueueForceScroll } from './renderer/spicy/original/utils/Scrolling/ScrollToActiveLine.ts';
 import { $bloomMode, $simpleLyricsMode, $joinSplitWords, $smoothScrolling } from './renderer/spicy/original/utils/stores.ts';
 import { LyricsObject } from './renderer/spicy/original/utils/Lyrics/lyrics.ts';
+import { MotionClock, MOTION_TUNING } from './renderer/kawarp/MotionClock.ts';
+import { TrackMotion } from './renderer/kawarp/TrackMotion.ts';
 
 const $ = id => document.getElementById(id);
 let poller = null;
@@ -120,9 +122,15 @@ let dynamicBackgroundEnabled = true;
 let ambientImageUrl = '';
 let nowbarMotionHls = null;
 let ambientRequestId = 0;
-let beatAnalysis = null;
-let beatAnalysisTrackId = null;
-let beatPulse = 0;
+let motionTrack = null;
+let motionClock = new MotionClock();
+let motionAnalysisStatus = 'waiting for a matching local audio file';
+let motionAnalysisSource = 'none';
+let motionAnalysisLabel = '';
+let motionAnalysisDuration = 0;
+let motionSegmentCount = 0;
+let motionLastFrameDeltaMs = 0;
+let motionLastDebugUpdate = 0;
 async function getKawarp(){
   if(kawarp) return kawarp;
   if(!kawarpLoading){
@@ -284,26 +292,104 @@ async function loadNowbarMotion(fallbackImageUrl=''){
   }
 }
 
-function loadBeatAnalysis(trackId){
-  if(!trackId || !/^[A-Za-z0-9]{22}$/.test(trackId)){
-    beatAnalysis = null;
-    beatAnalysisTrackId = trackId;
-    return;
-  }
-  if(beatAnalysisTrackId === trackId) return;
-  beatAnalysisTrackId = trackId;
-  beatAnalysis = null;
-  api('/api/spotify/analysis?trackId=' + encodeURIComponent(trackId))
-    .then(data => {
-      if(currentTrackId !== trackId || beatAnalysisTrackId !== trackId) return;
-      const beats = Array.isArray(data.beats) ? data.beats
-        .filter(beat => Number.isFinite(beat.start) && Number.isFinite(beat.duration) && beat.duration > 0)
-        .sort((a,b) => a.start - b.start) : [];
-      beatAnalysis = beats.length ? beats : null;
-    })
-    .catch(() => { if(beatAnalysisTrackId === trackId) beatAnalysis = null; });
+
+function resetMotionAnalysis(status = 'waiting for a matching local audio file'){
+  motionTrack = null;
+  motionClock = new MotionClock();
+  motionAnalysisStatus = status;
+  motionAnalysisSource = 'none';
+  motionAnalysisLabel = '';
+  motionAnalysisDuration = 0;
+  motionSegmentCount = 0;
+  const fileInput = $('motion-audio-file');
+  if(fileInput) fileInput.value = '';
+  renderMotionDebug();
 }
-function updateBeatPulse(){}
+async function analyzeLocalAudioFile(file){
+  if(!file) return;
+  if(!file.type.startsWith('audio/')) throw new Error('Please choose an audio file.');
+  if(file.size > 150 * 1024 * 1024) throw new Error('That file is over the 150 MB debug limit.');
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if(!AudioContextClass) throw new Error('This browser does not support local audio analysis.');
+  const context = new AudioContextClass();
+  try{
+    const decoded = await context.decodeAudioData(await file.arrayBuffer());
+    const windowFrames = Math.max(1, Math.floor(decoded.sampleRate * 0.25));
+    const segments = [];
+    for(let start = 0; start < decoded.length; start += windowFrames){
+      const end = Math.min(decoded.length, start + windowFrames);
+      let sumSquares = 0;
+      let sampleCount = 0;
+      for(let channel = 0; channel < decoded.numberOfChannels; channel++){
+        const samples = decoded.getChannelData(channel);
+        for(let i = start; i < end; i++){
+          const sample = samples[i];
+          sumSquares += sample * sample;
+          sampleCount++;
+        }
+      }
+      const rms = Math.sqrt(sumSquares / Math.max(1, sampleCount));
+      const loudness = 20 * Math.log10(Math.max(rms, 0.00001));
+      segments.push({
+        start: start / decoded.sampleRate,
+        loudnessStart: loudness,
+        loudnessMax: loudness,
+        peakAt: 0
+      });
+    }
+    if(!segments.length) throw new Error('The selected file did not contain decodable audio.');
+    motionTrack = new TrackMotion({ segments });
+    motionClock = new MotionClock();
+    motionClock.seed(currentPlaybackSeconds());
+    motionAnalysisStatus = 'ready — local file analyzed';
+    motionAnalysisSource = 'browser Web Audio API';
+    motionAnalysisLabel = file.name;
+    motionAnalysisDuration = decoded.duration;
+    motionSegmentCount = segments.length;
+    renderMotionDebug();
+  } finally {
+    await context.close().catch(() => {});
+  }
+}
+function motionDebugSnapshot(){
+  const position = currentPlaybackSeconds();
+  const rawEnergy = motionTrack
+    ? motionTrack.energyAt(position + MOTION_TUNING.energyLeadSeconds)
+    : null;
+  return {
+    trackId: currentTrackId,
+    playback: isPlaying ? 'playing' : 'paused',
+    playbackPositionSeconds: Number(position.toFixed(3)),
+    analysisSource: motionAnalysisSource,
+    analysisStatus: motionAnalysisStatus,
+    analysisFile: motionAnalysisLabel || null,
+    analysisDurationSeconds: motionAnalysisDuration ? Number(motionAnalysisDuration.toFixed(3)) : null,
+    segmentCount: motionSegmentCount,
+    rawEnergy: rawEnergy === null ? null : Number(rawEnergy.toFixed(4)),
+    smoothedEnergy: Number(motionClock.energy.toFixed(4)),
+    flowRate: Number(motionClock.rate.toFixed(4)),
+    zoomScale: Number(motionClock.scale.toFixed(4)),
+    attackSeconds: MOTION_TUNING.attackSeconds,
+    releaseSeconds: MOTION_TUNING.releaseSeconds,
+    energyLeadSeconds: MOTION_TUNING.energyLeadSeconds,
+    frameDeltaMs: Number(motionLastFrameDeltaMs.toFixed(2)),
+    kawarpAnimationSpeed: Number.isFinite(kawarp?.animationSpeed) ? Number(kawarp.animationSpeed.toFixed(4)) : null,
+    kawarpScale: Number.isFinite(kawarp?.scale) ? Number(kawarp.scale.toFixed(4)) : null
+  };
+}
+function renderMotionDebug(){
+  const report = $('motion-debug-report');
+  if(!report) return;
+  const snapshot = motionDebugSnapshot();
+  report.textContent = Object.entries(snapshot)
+    .map(([key, value]) => key + ': ' + (value === null ? '—' : value))
+    .join('\\n');
+  const raw = snapshot.rawEnergy ?? 0;
+  $('motion-energy-raw').value = String(raw);
+  $('motion-energy-smoothed').value = String(snapshot.smoothedEnergy);
+  $('motion-debug-status').textContent = motionAnalysisStatus;
+}
+
 function setDynamicBackgroundEnabled(enabled){
   dynamicBackgroundEnabled = enabled;
   $('dynamic-background').classList.toggle('off', !enabled);
@@ -1124,6 +1210,7 @@ async function playback(){
     if (!data.track) {
       if (currentTrackId !== null) {
         currentTrackId = null;
+        resetMotionAnalysis('No Spotify track is playing.');
         lyricRequestId++;
         clearLyrics();
       }
@@ -1134,8 +1221,7 @@ async function playback(){
     const nextTrackId = data.track.id || `${data.track.title}::${(data.track.artists || []).join(', ')}`;
     const trackChanged = nextTrackId !== currentTrackId;
     currentTrackId = nextTrackId;
-    if(trackChanged){ beatAnalysis = null; beatAnalysisTrackId = null; beatPulse = 0; }
-    loadBeatAnalysis(data.track.id);
+    if(trackChanged) resetMotionAnalysis('Track changed — load a matching local audio file.');
     $('track').hidden=false;
     $('title').textContent=data.track.title;
     $('artist').textContent=(data.track.artists||[]).join(', ') || 'Unknown artist';
@@ -1310,6 +1396,38 @@ $('repeat-toggle').onclick=()=>{const next=repeatState==='off'?'context':repeatS
 $('progress-bar').addEventListener('input',()=>{seekingProgress=true;$('progress-current').textContent=formatTime(Number($('progress-bar').value)/1000*trackDurationMs);});
 $('progress-bar').addEventListener('change',async()=>{const position=Math.round(Number($('progress-bar').value)/1000*trackDurationMs);seekingProgress=false;try{await api('/api/spotify/player/seek',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({position_ms:position,device_id:selectedDevice()||undefined})});latestProgressMs=position;progressObservedAt=Date.now();renderProgress();}catch(error){$('device-status').textContent='could not skip to that bit: '+error.message+' :(';await playback();}});
 $('find-lyrics').onclick=()=>findLyrics();
+$('motion-debug-button').onclick=()=>{
+  $('motion-debug-backdrop').classList.add('open');
+  renderMotionDebug();
+};
+$('motion-debug-close').onclick=()=>$('motion-debug-backdrop').classList.remove('open');
+$('motion-debug-backdrop').addEventListener('click',event=>{
+  if(event.target===$('motion-debug-backdrop')) $('motion-debug-backdrop').classList.remove('open');
+});
+$('motion-audio-file').addEventListener('change',async event=>{
+  const file=event.target.files?.[0];
+  if(!file) return;
+  motionAnalysisStatus='decoding local audio…';
+  renderMotionDebug();
+  try{
+    await analyzeLocalAudioFile(file);
+  }catch(error){
+    resetMotionAnalysis('analysis failed: '+(error?.message || String(error)));
+    $('motion-debug-status').textContent=motionAnalysisStatus;
+  }
+});
+$('motion-analysis-clear').onclick=()=>resetMotionAnalysis('analysis cleared — waiting for a local audio file');
+$('motion-debug-copy').onclick=async()=>{
+  try{
+    await navigator.clipboard.writeText(JSON.stringify(motionDebugSnapshot(),null,2));
+    $('motion-debug-copy').textContent='copied!!';
+  }catch{
+    $('motion-debug-copy').textContent='copy unavailable';
+  }
+};
+document.addEventListener('keydown',event=>{
+  if(event.key==='Escape') $('motion-debug-backdrop').classList.remove('open');
+});
 $('dynamic-background-toggle').onclick=()=>setDynamicBackgroundEnabled(!dynamicBackgroundEnabled);
 $('refresh-fancy-background').onclick=async()=>{
   if(!ambientImageUrl){ say('there is no fancy background to refresh yet. play something first maybe'); return; }
@@ -1359,6 +1477,16 @@ lyricHost.addEventListener('click',event=>{
 function animateAMLL(frameTime){
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
   lastFrameTime=frameTime;
+  motionLastFrameDeltaMs=delta;
+  const motionFrame=motionClock.step(delta/1000,currentPlaybackSeconds(),isPlaying,motionTrack);
+  if(kawarp){
+    kawarp.animationSpeed=motionTrack ? motionFrame.rate : 1;
+    kawarp.scale=motionTrack ? motionFrame.scale : 1;
+  }
+  if($('motion-debug-backdrop')?.classList.contains('open') && frameTime-motionLastDebugUpdate>120){
+    motionLastDebugUpdate=frameTime;
+    renderMotionDebug();
+  }
   if(lyricRendererMode==='port' && originalSpicyEngine){
     const position=Math.round(currentPlaybackSeconds()*1000);
     originalSpicyEngine.setPosition(position);
@@ -1371,7 +1499,6 @@ function animateAMLL(frameTime){
     renderProgress();
     amllPlayer.update(delta);
   }
-  updateBeatPulse();
   requestAnimationFrame(animateAMLL);
 }
 requestAnimationFrame(animateAMLL);
