@@ -472,7 +472,7 @@ function drawMotionDebugGraph(){
     let started=false;
     samples.forEach((sample,index)=>{
       if(sample[key]===null || !Number.isFinite(sample[key])) { started=false; return; }
-      const x=left+plotW*(index/Math.max(1,MOTION_DEBUG_HISTORY_LIMIT-1));
+      const x=left+plotW*(index/Math.max(1,samples.length-1));
       const y=top+plotH*(1-Math.max(0,Math.min(1,sample[key])));
       if(!started){ctx.moveTo(x,y);started=true;} else ctx.lineTo(x,y);
     });
