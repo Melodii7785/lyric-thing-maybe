@@ -24,9 +24,9 @@ export interface MotionFrame {
 
 export class MotionClock {
   time = 0;
-  energy = MOTION_TUNING.neutralEnergy;
-  rate = MOTION_TUNING.unanalyzedRate * MOTION_TUNING.intensity;
-  scale = 1;
+  energy: number = MOTION_TUNING.neutralEnergy;
+  rate: number = MOTION_TUNING.unanalyzedRate * MOTION_TUNING.intensity;
+  scale: number = 1;
   private playbackBlend = 0;
   private analysisBlend = 0;
 
