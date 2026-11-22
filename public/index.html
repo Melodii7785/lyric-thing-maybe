@@ -230,6 +230,13 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
 #doctor-close{float:right;background:transparent;border-color:#666}
 @media(max-width:600px){#top-tools{top:8px;right:8px;gap:5px;max-width:calc(100vw - 16px)}#top-tools button{font-size:.58rem;min-height:32px;padding:5px 6px}#doctor-dialog{padding:14px}}
 
+/* Mobile-only phrase entry: unobtrusive and at the bottom of the page. */
+#mobile-debug-entry{display:none;margin:28px 0 4px;padding-top:12px;border-top:1px solid #333}
+#mobile-debug-entry label{display:block;margin-bottom:6px;color:#777;font-size:.72rem}
+#mobile-debug-entry input{width:100%;min-height:42px;padding:9px 11px;background:#151515;color:#eee;border:1px solid #444;border-radius:0;font:inherit}
+#mobile-debug-entry input:focus{border-color:#777}
+#mobile-debug-entry-status{min-height:1.3em;margin:5px 0 0;color:#777;font-size:.72rem}
+@media(max-width:600px){#mobile-debug-entry{display:block}}
 </style>
 </head>
 <body>
@@ -346,6 +353,11 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
 </section>
 <p class="muted">made with AMLL + Spicy Lyrics + questionable amounts of hope. lyrics may be synced, unsynced, or simply not here. technology!!</p>
 
+<form id="mobile-debug-entry" autocomplete="off">
+  <label for="mobile-debug-phrase">type here and something MAY happen.</label>
+  <input id="mobile-debug-phrase" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Hidden debug unlock phrase">
+  <p id="mobile-debug-entry-status" role="status"></p>
+</form>
 <div id="top-tools"><button id="renderer-toggle-button" class="secondary" type="button" disabled>okay let's try ✨ le port ✨</button><button id="motion-debug-button" class="secondary" type="button">move with the music — debug</button><button id="doctor-button" type="button">yes i am a doctor show me the reports</button></div>
 <div id="doctor-backdrop" role="dialog" aria-modal="true" aria-labelledby="doctor-title">
   <section id="doctor-dialog">
@@ -416,6 +428,19 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
       $('top-tools').classList.add('unlocked');
       debugBuffer='';
       add('info',['Developer tools unlocked.']);
+    }
+  });
+  $('mobile-debug-entry').addEventListener('submit',event=>{
+    event.preventDefault();
+    const input=$('mobile-debug-phrase');
+    if(input.value.trim().toLowerCase()===debugPhrase){
+      $('top-tools').classList.add('unlocked');
+      input.value='';
+      $('mobile-debug-entry-status').textContent='well. something happened.';
+      add('info',['Developer tools unlocked through mobile phrase entry.']);
+    }else{
+      $('mobile-debug-entry-status').textContent='nothing happened. which is technically something.';
+      input.select();
     }
   });
   const report=()=>{
