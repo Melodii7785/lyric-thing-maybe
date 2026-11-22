@@ -202,7 +202,6 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
   #motion-debug-dialog h2{margin:0 0 8px;font-size:1.2rem}
   #motion-debug-dialog p{color:#afbfca;font-size:.84rem;line-height:1.45}
   #motion-debug-dialog label{display:block;margin:12px 0 6px;font-size:.88rem;font-weight:700}
-  #motion-debug-dialog input[type=file]{display:block;width:100%;margin-top:7px;font:inherit}
   #motion-debug-readings{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:15px 0}
   #motion-debug-readings progress{width:100%;height:14px;accent-color:#64c7a4}
   #motion-debug-report{white-space:pre-wrap;overflow-wrap:anywhere;background:#080d11;border:1px solid #40505d;padding:12px;font:12px/1.5 ui-monospace,monospace;color:#c8eadb;max-height:38vh;overflow:auto}
@@ -361,11 +360,8 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
   <section id="motion-debug-dialog">
     <button id="motion-debug-close" type="button" class="secondary">close ×</button>
     <h2 id="motion-debug-title">move with the music — debug</h2>
-    <p id="motion-debug-status" role="status">waiting for a matching local audio file</p>
-    <label for="motion-audio-file">load an audio file for its energy envelope
-      <input id="motion-audio-file" type="file" accept="audio/*">
-    </label>
-    <p>The file is decoded locally in this browser and is never uploaded. Play the matching recording in Spotify, then load the same version here so its loudness envelope can follow Spotify's playback position. This is a development input, not Spotify-provided audio analysis.</p>
+    <p id="motion-debug-status" role="status">waiting for Spotify audio analysis</p>
+    <p>Uses the currently playing Spotify track’s actual audio-analysis segments. Track changes trigger a fresh analysis automatically.</p>
     <div id="motion-debug-readings">
       <div><label for="motion-energy-raw">raw normalized energy</label><progress id="motion-energy-raw" max="1" value="0.35"></progress></div>
       <div><label for="motion-energy-smoothed">smoothed energy</label><progress id="motion-energy-smoothed" max="1" value="0.35"></progress></div>
@@ -377,7 +373,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
     <pre id="motion-debug-report">motion engine initializing…</pre>
     <div id="motion-debug-actions">
       <button id="motion-test-button" type="button">run motion engine checks</button>
-      <button id="motion-analysis-clear" type="button" class="secondary">clear analysis</button>
+      <button id="motion-analysis-clear" type="button" class="secondary">refresh Spotify analysis</button>
       <button id="motion-debug-copy" type="button" class="secondary">copy debug snapshot</button>
     </div>
     <pre id="motion-test-results">self-checks have not been run yet.</pre>
