@@ -33,6 +33,7 @@ export class TrackMotion {
   private readonly values: number[];
   private readonly lowDb: number;
   private readonly highDb: number;
+  private readonly isFlat: boolean;
 
   constructor(analysis: EnergyAnalysis) {
     const segments = [...(analysis.segments ?? [])]
@@ -53,13 +54,16 @@ export class TrackMotion {
     const sorted = [...this.values].sort((a, b) => a - b);
     const floor = percentile(sorted, 0.1);
     const ceiling = percentile(sorted, 0.9);
-    const range = Math.max(MIN_RANGE_DB, ceiling - floor);
+    const dynamicRange = ceiling - floor;
+    this.isFlat = dynamicRange < MIN_RANGE_DB;
+    const range = Math.max(MIN_RANGE_DB, dynamicRange);
     this.lowDb = floor;
     this.highDb = floor + range;
   }
 
   /** Energy at a song-relative position in seconds. Returns neutral for empty data. */
   energyAt(positionSeconds: number): number {
+    if (this.isFlat) return 0.35;
     if (!this.starts.length || !Number.isFinite(positionSeconds) || positionSeconds < this.starts[0]) return 0.35;
     let lo = 0, hi = this.starts.length - 1;
     while (lo < hi) {
