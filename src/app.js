@@ -132,6 +132,8 @@ let motionSegmentCount = 0;
 let motionLastFrameDeltaMs = 0;
 let motionLastDebugUpdate = 0;
 let motionAnalysisRequestId = 0;
+const motionDebugHistory = [];
+const MOTION_DEBUG_HISTORY_LIMIT = 120;
 async function getKawarp(){
   if(kawarp) return kawarp;
   if(!kawarpLoading){
@@ -296,6 +298,7 @@ async function loadNowbarMotion(fallbackImageUrl=''){
 
 function resetMotionAnalysis(status = 'waiting for a matching local audio file'){
   motionAnalysisRequestId++;
+  motionDebugHistory.length = 0;
   motionTrack = null;
   motionClock = new MotionClock();
   motionAnalysisStatus = status;
@@ -435,6 +438,51 @@ function runMotionEngineChecks(){
   return results;
 }
 
+function drawMotionDebugGraph(){
+  const canvas = $('motion-debug-graph');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if(!ctx) return;
+  const width = Math.max(1, canvas.clientWidth);
+  const height = Math.max(1, canvas.clientHeight);
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  if(canvas.width !== Math.round(width*dpr) || canvas.height !== Math.round(height*dpr)){
+    canvas.width = Math.round(width*dpr);
+    canvas.height = Math.round(height*dpr);
+  }
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,width,height);
+  ctx.fillStyle = '#080d11';
+  ctx.fillRect(0,0,width,height);
+  const left=28, right=8, top=8, bottom=18;
+  const plotW=width-left-right, plotH=height-top-bottom;
+  ctx.font='10px ui-monospace, monospace';
+  ctx.textAlign='right';
+  ctx.textBaseline='middle';
+  for(let tick=0;tick<=4;tick++){
+    const value=tick/4, y=top+plotH*(1-value);
+    ctx.strokeStyle='#26343e'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(width-right,y); ctx.stroke();
+    ctx.fillStyle='#8295a4'; ctx.fillText(value.toFixed(2),left-5,y);
+  }
+  const drawLine=(key,color)=>{
+    const samples=motionDebugHistory;
+    ctx.strokeStyle=color; ctx.lineWidth=1.8; ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.beginPath();
+    let started=false;
+    samples.forEach((sample,index)=>{
+      if(sample[key]===null || !Number.isFinite(sample[key])) { started=false; return; }
+      const x=left+plotW*(index/Math.max(1,MOTION_DEBUG_HISTORY_LIMIT-1));
+      const y=top+plotH*(1-Math.max(0,Math.min(1,sample[key])));
+      if(!started){ctx.moveTo(x,y);started=true;} else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  };
+  drawLine('raw','#65c9e7');
+  drawLine('smoothed','#65c7a4');
+  ctx.fillStyle='#8294a2'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.fillText('history →',left,height-4);
+}
 function renderMotionDebug(){
   const report = $('motion-debug-report');
   if(!report) return;
@@ -445,6 +493,9 @@ function renderMotionDebug(){
   const raw = snapshot.rawEnergy ?? 0;
   $('motion-energy-raw').value = String(raw);
   $('motion-energy-smoothed').value = String(snapshot.smoothedEnergy);
+  motionDebugHistory.push({ raw: snapshot.rawEnergy, smoothed: snapshot.smoothedEnergy });
+  if(motionDebugHistory.length > MOTION_DEBUG_HISTORY_LIMIT) motionDebugHistory.shift();
+  drawMotionDebugGraph();
   $('motion-debug-status').textContent = motionAnalysisStatus;
 }
 
