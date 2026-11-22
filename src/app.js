@@ -383,7 +383,7 @@ function renderMotionDebug(){
   const snapshot = motionDebugSnapshot();
   report.textContent = Object.entries(snapshot)
     .map(([key, value]) => key + ': ' + (value === null ? '—' : value))
-    .join('\\n');
+    .join('\n');
   const raw = snapshot.rawEnergy ?? 0;
   $('motion-energy-raw').value = String(raw);
   $('motion-energy-smoothed').value = String(snapshot.smoothedEnergy);
