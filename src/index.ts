@@ -528,7 +528,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const playback = await playbackResponse.json() as any;
     if (playback?.item?.id !== trackId) return json({ error: "track_changed" }, 409);
 
-    // Spotify's web-player analysis endpoint is undocumented. Treat it as optional and fail soft.
+    // Fetch current-track energy segments; gracefully handle unavailable analysis.
     try {
       const embedResponse = await fetch("https://open.spotify.com/embed/track/" + trackId, {
         headers: { "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36" },
@@ -546,15 +546,21 @@ async function handle(request: Request, env: Env): Promise<Response> {
       });
       if (!analysisResponse.ok) return json({ error: "analysis_unavailable" }, 502);
       const analysis = await analysisResponse.json() as any;
-      const beats = Array.isArray(analysis?.beats) ? analysis.beats
-        .filter((beat: any) => Number.isFinite(beat?.start) && Number.isFinite(beat?.duration) && beat.duration > 0)
-        .map((beat: any) => ({
-          start: beat.start,
-          duration: beat.duration,
-          confidence: Number.isFinite(beat.confidence) ? beat.confidence : 0.8,
+      const segments = Array.isArray(analysis?.segments) ? analysis.segments
+        .filter((segment: any) => Number.isFinite(segment?.start) && Number.isFinite(segment?.loudnessStart) && Number.isFinite(segment?.loudnessMax) && Number.isFinite(segment?.peakAt))
+        .map((segment: any) => ({
+          start: segment.start,
+          loudnessStart: segment.loudnessStart,
+          loudnessMax: segment.loudnessMax,
+          peakAt: segment.peakAt,
         })) : [];
-      if (!beats.length) return json({ error: "analysis_unavailable" }, 502);
-      return json({ trackId, tempo: Number.isFinite(analysis?.track?.tempo) ? analysis.track.tempo : null, beats });
+      if (!segments.length) return json({ error: "analysis_unavailable", details: "No usable energy segments were returned." }, 502);
+      return json({
+        trackId,
+        tempo: Number.isFinite(analysis?.track?.tempo) ? analysis.track.tempo : null,
+        durationSeconds: Number.isFinite(analysis?.track?.duration) ? analysis.track.duration : null,
+        segments,
+      });
     } catch {
       return json({ error: "analysis_unavailable" }, 502);
     }
