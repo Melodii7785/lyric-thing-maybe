@@ -131,6 +131,7 @@ let motionAnalysisDuration = 0;
 let motionSegmentCount = 0;
 let motionLastFrameDeltaMs = 0;
 let motionLastDebugUpdate = 0;
+let motionAnalysisRequestId = 0;
 async function getKawarp(){
   if(kawarp) return kawarp;
   if(!kawarpLoading){
@@ -294,6 +295,7 @@ async function loadNowbarMotion(fallbackImageUrl=''){
 
 
 function resetMotionAnalysis(status = 'waiting for a matching local audio file'){
+  motionAnalysisRequestId++;
   motionTrack = null;
   motionClock = new MotionClock();
   motionAnalysisStatus = status;
@@ -307,6 +309,8 @@ function resetMotionAnalysis(status = 'waiting for a matching local audio file')
 }
 async function analyzeLocalAudioFile(file){
   if(!file) return;
+  const requestId = ++motionAnalysisRequestId;
+  const trackIdAtStart = currentTrackId;
   if(!file.type.startsWith('audio/')) throw new Error('Please choose an audio file.');
   if(file.size > 150 * 1024 * 1024) throw new Error('That file is over the 150 MB debug limit.');
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -314,6 +318,9 @@ async function analyzeLocalAudioFile(file){
   const context = new AudioContextClass();
   try{
     const decoded = await context.decodeAudioData(await file.arrayBuffer());
+    if(requestId !== motionAnalysisRequestId || trackIdAtStart !== currentTrackId){
+      throw new Error('Spotify playback changed while the file was being analyzed. Please choose it again.');
+    }
     const windowFrames = Math.max(1, Math.floor(decoded.sampleRate * 0.25));
     const segments = [];
     for(let start = 0; start < decoded.length; start += windowFrames){
@@ -358,6 +365,7 @@ function motionDebugSnapshot(){
     : null;
   return {
     trackId: currentTrackId,
+    trackTitle: $('title')?.textContent || null,
     playback: isPlaying ? 'playing' : 'paused',
     playbackPositionSeconds: Number(position.toFixed(3)),
     analysisSource: motionAnalysisSource,
@@ -377,6 +385,56 @@ function motionDebugSnapshot(){
     kawarpScale: Number.isFinite(kawarp?.scale) ? Number(kawarp.scale.toFixed(4)) : null
   };
 }
+
+function runMotionEngineChecks(){
+  const results = [];
+  const check = (name, condition, detail = '') => results.push({ name, passed: !!condition, detail });
+  const segments = [
+    { start: 0, loudnessStart: -38, loudnessMax: -38, peakAt: 0 },
+    { start: 4, loudnessStart: -37, loudnessMax: -37, peakAt: 0 },
+    { start: 8, loudnessStart: -25, loudnessMax: -25, peakAt: 0 },
+    { start: 12, loudnessStart: -8, loudnessMax: -8, peakAt: 0 },
+    { start: 16, loudnessStart: -20, loudnessMax: -20, peakAt: 0 },
+    { start: 20, loudnessStart: -38, loudnessMax: -38, peakAt: 0 }
+  ];
+  const track = new TrackMotion({ segments });
+  const quiet = track.energyAt(0.5);
+  const loud = track.energyAt(12);
+  check('quiet-to-loud envelope', loud > quiet && loud <= 1, 'quiet=' + quiet.toFixed(3) + ', loud=' + loud.toFixed(3));
+
+  const flat = new TrackMotion({ segments: [0, 5, 10].map(start => ({
+    start, loudnessStart: -18, loudnessMax: -18, peakAt: 0
+  })) });
+  check('flat track stays neutral', Math.abs(flat.energyAt(5) - 0.35) < 0.001, 'expected 0.35, got ' + flat.energyAt(5).toFixed(3));
+
+  const clock = new MotionClock();
+  for(let i = 0; i < 240; i++) clock.step(1 / 60, 12, true, track);
+  const chorusEnergy = clock.energy;
+  const chorusRate = clock.rate;
+  const chorusScale = clock.scale;
+  check('clock follows loud section', chorusEnergy > 0.7, 'smoothed energy=' + chorusEnergy.toFixed(3));
+  check('rate and scale remain finite', Number.isFinite(chorusRate) && Number.isFinite(chorusScale), 'rate=' + chorusRate.toFixed(3) + ', scale=' + chorusScale.toFixed(3));
+
+  for(let i = 0; i < 240; i++) clock.step(1 / 60, 0, true, track);
+  check('backward seek settles toward quiet', clock.energy < chorusEnergy, 'after seek=' + clock.energy.toFixed(3));
+
+  const beforePause = clock.rate;
+  for(let i = 0; i < 240; i++) clock.step(1 / 60, 0, false, track);
+  check('pause eases motion down', clock.rate < beforePause, 'before=' + beforePause.toFixed(3) + ', paused=' + clock.rate.toFixed(3));
+
+  const previousTime = clock.time;
+  const cappedFrame = clock.step(1, 0, false, track);
+  const advance = cappedFrame.time - previousTime;
+  check('large frame delta is capped', advance <= MOTION_TUNING.maxFrameStepSeconds * cappedFrame.rate + 0.000001,
+    'advance=' + advance.toFixed(4) + 's');
+
+  const passed = results.filter(result => result.passed).length;
+  $('motion-test-results').textContent = results.map(result =>
+    (result.passed ? 'PASS' : 'FAIL') + '  ' + result.name + (result.detail ? ' — ' + result.detail : '')
+  ).join('\\n') + '\\n\\n' + passed + '/' + results.length + ' checks passed';
+  return results;
+}
+
 function renderMotionDebug(){
   const report = $('motion-debug-report');
   if(!report) return;
@@ -1417,6 +1475,7 @@ $('motion-audio-file').addEventListener('change',async event=>{
   }
 });
 $('motion-analysis-clear').onclick=()=>resetMotionAnalysis('analysis cleared — waiting for a local audio file');
+$('motion-test-button').onclick=runMotionEngineChecks;
 $('motion-debug-copy').onclick=async()=>{
   try{
     await navigator.clipboard.writeText(JSON.stringify(motionDebugSnapshot(),null,2));
