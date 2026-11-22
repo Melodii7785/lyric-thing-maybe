@@ -124,7 +124,7 @@ let nowbarMotionHls = null;
 let ambientRequestId = 0;
 let motionTrack = null;
 let motionClock = new MotionClock();
-let motionAnalysisStatus = 'waiting for a matching local audio file';
+let motionAnalysisStatus = 'waiting for Spotify audio analysis';
 let motionAnalysisSource = 'none';
 let motionAnalysisLabel = '';
 let motionAnalysisDuration = 0;
@@ -132,6 +132,9 @@ let motionSegmentCount = 0;
 let motionLastFrameDeltaMs = 0;
 let motionLastDebugUpdate = 0;
 let motionAnalysisRequestId = 0;
+let motionAnalysisInFlight = false;
+let motionAnalysisRetryAt = 0;
+let motionAnalysisSegments = [];
 const motionDebugHistory = [];
 const MOTION_DEBUG_HISTORY_LIMIT = 120;
 async function getKawarp(){
@@ -296,69 +299,65 @@ async function loadNowbarMotion(fallbackImageUrl=''){
 }
 
 
-function resetMotionAnalysis(status = 'waiting for a matching local audio file'){
+function resetMotionAnalysis(status = 'waiting for Spotify audio analysis'){
   motionAnalysisRequestId++;
-  motionDebugHistory.length = 0;
-  motionTrack = null;
-  motionClock = new MotionClock();
-  motionAnalysisStatus = status;
-  motionAnalysisSource = 'none';
-  motionAnalysisLabel = '';
-  motionAnalysisDuration = 0;
-  motionSegmentCount = 0;
-  const fileInput = $('motion-audio-file');
-  if(fileInput) fileInput.value = '';
+  motionAnalysisInFlight=false;
+  motionAnalysisRetryAt=0;
+  motionDebugHistory.length=0;
+  motionTrack=null;
+  motionAnalysisSegments=[];
+  motionClock=new MotionClock();
+  motionAnalysisStatus=status;
+  motionAnalysisSource='none';
+  motionAnalysisLabel='';
+  motionAnalysisDuration=0;
+  motionSegmentCount=0;
   renderMotionDebug();
 }
-async function analyzeLocalAudioFile(file){
-  if(!file) return;
-  const requestId = ++motionAnalysisRequestId;
-  const trackIdAtStart = currentTrackId;
-  if(!file.type.startsWith('audio/')) throw new Error('Please choose an audio file.');
-  if(file.size > 150 * 1024 * 1024) throw new Error('That file is over the 150 MB debug limit.');
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if(!AudioContextClass) throw new Error('This browser does not support local audio analysis.');
-  const context = new AudioContextClass();
+async function loadSpotifyAnalysis(trackId, force=false){
+  if(!trackId || !/^[A-Za-z0-9]{22}$/.test(trackId)) return;
+  if(motionAnalysisInFlight) return;
+  if(!force && motionTrack && motionAnalysisLabel===trackId) return;
+  if(!force && Date.now()<motionAnalysisRetryAt) return;
+  const requestId=++motionAnalysisRequestId;
+  const trackIdAtStart=trackId;
+  motionAnalysisInFlight=true;
+  motionAnalysisStatus='fetching Spotify audio analysis…';
+  motionAnalysisSource='Spotify Web Player audio-analysis';
+  motionAnalysisLabel=trackId;
+  renderMotionDebug();
   try{
-    const decoded = await context.decodeAudioData(await file.arrayBuffer());
-    if(requestId !== motionAnalysisRequestId || trackIdAtStart !== currentTrackId){
-      throw new Error('Spotify playback changed while the file was being analyzed. Please choose it again.');
-    }
-    const windowFrames = Math.max(1, Math.floor(decoded.sampleRate * 0.25));
-    const segments = [];
-    for(let start = 0; start < decoded.length; start += windowFrames){
-      const end = Math.min(decoded.length, start + windowFrames);
-      let sumSquares = 0;
-      let sampleCount = 0;
-      for(let channel = 0; channel < decoded.numberOfChannels; channel++){
-        const samples = decoded.getChannelData(channel);
-        for(let i = start; i < end; i++){
-          const sample = samples[i];
-          sumSquares += sample * sample;
-          sampleCount++;
-        }
-      }
-      const rms = Math.sqrt(sumSquares / Math.max(1, sampleCount));
-      const loudness = 20 * Math.log10(Math.max(rms, 0.00001));
-      segments.push({
-        start: start / decoded.sampleRate,
-        loudnessStart: loudness,
-        loudnessMax: loudness,
-        peakAt: 0
-      });
-    }
-    if(!segments.length) throw new Error('The selected file did not contain decodable audio.');
-    motionTrack = new TrackMotion({ segments });
-    motionClock = new MotionClock();
+    const data=await api('/api/spotify/analysis?trackId='+encodeURIComponent(trackIdAtStart));
+    if(requestId!==motionAnalysisRequestId || trackIdAtStart!==currentTrackId) return;
+    const segments=Array.isArray(data.segments)?data.segments.filter(segment=>
+      Number.isFinite(segment?.start) &&
+      Number.isFinite(segment?.loudnessStart) &&
+      Number.isFinite(segment?.loudnessMax) &&
+      Number.isFinite(segment?.peakAt)
+    ).sort((a,b)=>a.start-b.start): [];
+    if(!segments.length) throw new Error('Spotify returned no usable energy segments.');
+    motionAnalysisSegments=segments;
+    motionTrack=new TrackMotion({segments});
+    motionClock=new MotionClock();
     motionClock.seed(currentPlaybackSeconds());
-    motionAnalysisStatus = 'ready — local file analyzed';
-    motionAnalysisSource = 'browser Web Audio API';
-    motionAnalysisLabel = file.name;
-    motionAnalysisDuration = decoded.duration;
-    motionSegmentCount = segments.length;
+    motionAnalysisStatus='ready — Spotify energy segments loaded';
+    motionAnalysisSource='Spotify audio-analysis segments';
+    motionAnalysisLabel=trackIdAtStart;
+    motionAnalysisDuration=Number.isFinite(data.durationSeconds)?data.durationSeconds:trackDurationMs/1000;
+    motionSegmentCount=segments.length;
+    motionAnalysisRetryAt=0;
     renderMotionDebug();
-  } finally {
-    await context.close().catch(() => {});
+  }catch(error){
+    if(requestId!==motionAnalysisRequestId || trackIdAtStart!==currentTrackId) return;
+    motionTrack=null;
+    motionAnalysisSegments=[];
+    motionAnalysisStatus='analysis unavailable: '+(error?.message||String(error));
+    motionAnalysisSource='Spotify audio-analysis request';
+    motionAnalysisLabel=trackIdAtStart;
+    motionAnalysisRetryAt=Date.now()+8000;
+    renderMotionDebug();
+  }finally{
+    if(requestId===motionAnalysisRequestId) motionAnalysisInFlight=false;
   }
 }
 function motionDebugSnapshot(){
@@ -366,6 +365,15 @@ function motionDebugSnapshot(){
   const rawEnergy = motionTrack
     ? motionTrack.energyAt(position + MOTION_TUNING.energyLeadSeconds)
     : null;
+  let currentSegmentIndex=-1;
+  for(let i=0;i<motionAnalysisSegments.length;i++){
+    if(motionAnalysisSegments[i].start<=position) currentSegmentIndex=i;
+    else break;
+  }
+  const currentSegment=currentSegmentIndex>=0?motionAnalysisSegments[currentSegmentIndex]:null;
+  const segmentPreview=currentSegmentIndex>=0
+    ?motionAnalysisSegments.slice(Math.max(0,currentSegmentIndex-2),currentSegmentIndex+5)
+    :motionAnalysisSegments.slice(0,7);
   return {
     trackId: currentTrackId,
     trackTitle: $('title')?.textContent || null,
@@ -373,7 +381,21 @@ function motionDebugSnapshot(){
     playbackPositionSeconds: Number(position.toFixed(3)),
     analysisSource: motionAnalysisSource,
     analysisStatus: motionAnalysisStatus,
-    analysisFile: motionAnalysisLabel || null,
+    analysisTrackId: motionAnalysisLabel || null,
+    analysisInFlight: motionAnalysisInFlight,
+    currentSegmentIndex,
+    currentSegment: currentSegment ? {
+      start: Number(currentSegment.start.toFixed(3)),
+      loudnessStart: Number(currentSegment.loudnessStart.toFixed(2)),
+      loudnessMax: Number(currentSegment.loudnessMax.toFixed(2)),
+      peakAt: Number(currentSegment.peakAt.toFixed(3))
+    } : null,
+    nearbySegments: segmentPreview.map(segment=>({
+      start: Number(segment.start.toFixed(3)),
+      loudnessStart: Number(segment.loudnessStart.toFixed(2)),
+      loudnessMax: Number(segment.loudnessMax.toFixed(2)),
+      peakAt: Number(segment.peakAt.toFixed(3))
+    })),
     analysisDurationSeconds: motionAnalysisDuration ? Number(motionAnalysisDuration.toFixed(3)) : null,
     segmentCount: motionSegmentCount,
     rawEnergy: rawEnergy === null ? null : Number(rawEnergy.toFixed(4)),
@@ -1330,7 +1352,7 @@ async function playback(){
     const nextTrackId = data.track.id || `${data.track.title}::${(data.track.artists || []).join(', ')}`;
     const trackChanged = nextTrackId !== currentTrackId;
     currentTrackId = nextTrackId;
-    if(trackChanged) resetMotionAnalysis('Track changed — load a matching local audio file.');
+    if(trackChanged) resetMotionAnalysis('Track changed — fetching Spotify audio analysis…');
     $('track').hidden=false;
     $('title').textContent=data.track.title;
     $('artist').textContent=(data.track.artists||[]).join(', ') || 'Unknown artist';
@@ -1364,6 +1386,8 @@ async function playback(){
     if(['off','context','track'].includes(data.repeatState)){repeatState=data.repeatState;$('repeat-toggle').setAttribute('aria-pressed',String(repeatState!=='off'));$('repeat-toggle').setAttribute('aria-label','Repeat '+repeatState);$('repeat-toggle').title='Repeat '+repeatState;}
     renderProgress();
     isPlaying=!!data.playing;
+    if(trackChanged) void loadSpotifyAnalysis(nextTrackId, true);
+    else if(!motionTrack && !motionAnalysisInFlight && Date.now()>=motionAnalysisRetryAt && /^[A-Za-z0-9]{22}$/.test(nextTrackId)) void loadSpotifyAnalysis(nextTrackId);
     if(amllPlayer){
       amllPlayer.setCurrentTime(Math.round(latestProgressMs),true);
       if(isPlaying) amllPlayer.resume(); else amllPlayer.pause();
@@ -1508,24 +1532,17 @@ $('find-lyrics').onclick=()=>findLyrics();
 $('motion-debug-button').onclick=()=>{
   $('motion-debug-backdrop').classList.add('open');
   renderMotionDebug();
+  if(currentTrackId && /^[A-Za-z0-9]{22}$/.test(currentTrackId) && !motionTrack && !motionAnalysisInFlight) void loadSpotifyAnalysis(currentTrackId, true);
 };
 $('motion-debug-close').onclick=()=>$('motion-debug-backdrop').classList.remove('open');
 $('motion-debug-backdrop').addEventListener('click',event=>{
   if(event.target===$('motion-debug-backdrop')) $('motion-debug-backdrop').classList.remove('open');
 });
-$('motion-audio-file').addEventListener('change',async event=>{
-  const file=event.target.files?.[0];
-  if(!file) return;
-  motionAnalysisStatus='decoding local audio…';
-  renderMotionDebug();
-  try{
-    await analyzeLocalAudioFile(file);
-  }catch(error){
-    resetMotionAnalysis('analysis failed: '+(error?.message || String(error)));
-    $('motion-debug-status').textContent=motionAnalysisStatus;
-  }
-});
-$('motion-analysis-clear').onclick=()=>resetMotionAnalysis('analysis cleared — waiting for a local audio file');
+$('motion-analysis-clear').onclick=()=>{
+  resetMotionAnalysis('refreshing Spotify analysis…');
+  if(currentTrackId && /^[A-Za-z0-9]{22}$/.test(currentTrackId)) void loadSpotifyAnalysis(currentTrackId, true);
+  else { motionAnalysisStatus='no valid Spotify track is active'; renderMotionDebug(); }
+};
 $('motion-test-button').onclick=runMotionEngineChecks;
 $('motion-debug-copy').onclick=async()=>{
   try{
