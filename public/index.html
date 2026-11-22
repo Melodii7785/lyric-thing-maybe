@@ -206,6 +206,13 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
   #motion-debug-readings{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:15px 0}
   #motion-debug-readings progress{width:100%;height:14px;accent-color:#64c7a4}
   #motion-debug-report{white-space:pre-wrap;overflow-wrap:anywhere;background:#080d11;border:1px solid #40505d;padding:12px;font:12px/1.5 ui-monospace,monospace;color:#c8eadb;max-height:38vh;overflow:auto}
+  .motion-debug-graph-wrap{margin:12px 0 4px;background:#080d11;border:1px solid #40505d;padding:8px}
+  #motion-debug-graph{display:block;width:100%;height:140px}
+  .motion-debug-legend{display:flex;gap:14px;flex-wrap:wrap;font:11px ui-monospace,monospace;color:#b9c9d3;padding:4px 0 0}
+  .motion-debug-legend span{display:inline-flex;align-items:center;gap:5px}
+  .motion-debug-legend i{display:inline-block;width:9px;height:9px;border-radius:50%}
+  .motion-debug-legend i.raw{background:#65c9e7}
+  .motion-debug-legend i.smoothed{background:#65c7a4}
   #motion-debug-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
   #motion-debug-close{float:right;background:transparent;border-color:#667}
   @media(max-width:600px){#motion-debug-dialog{padding:14px}#motion-debug-readings{grid-template-columns:1fr}}
@@ -362,6 +369,10 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
     <div id="motion-debug-readings">
       <div><label for="motion-energy-raw">raw normalized energy</label><progress id="motion-energy-raw" max="1" value="0.35"></progress></div>
       <div><label for="motion-energy-smoothed">smoothed energy</label><progress id="motion-energy-smoothed" max="1" value="0.35"></progress></div>
+    </div>
+    <div class="motion-debug-graph-wrap">
+      <canvas id="motion-debug-graph" aria-label="Recent normalized raw and smoothed energy history" role="img"></canvas>
+      <div class="motion-debug-legend"><span><i class="raw"></i>raw energy</span><span><i class="smoothed"></i>smoothed energy</span></div>
     </div>
     <pre id="motion-debug-report">motion engine initializing…</pre>
     <div id="motion-debug-actions">
