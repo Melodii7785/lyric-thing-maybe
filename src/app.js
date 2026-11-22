@@ -431,7 +431,7 @@ function runMotionEngineChecks(){
   const passed = results.filter(result => result.passed).length;
   $('motion-test-results').textContent = results.map(result =>
     (result.passed ? 'PASS' : 'FAIL') + '  ' + result.name + (result.detail ? ' — ' + result.detail : '')
-  ).join('\\n') + '\\n\\n' + passed + '/' + results.length + ' checks passed';
+  ).join('\n') + '\n\n' + passed + '/' + results.length + ' checks passed';
   return results;
 }
 
