@@ -134,6 +134,10 @@ let motionLastDebugUpdate = 0;
 let motionAnalysisRequestId = 0;
 let motionAnalysisInFlight = false;
 let motionAnalysisRetryAt = 0;
+let lastMotionRequestId = null;
+let lastMotionServerRequestId = null;
+let lastMotionHttpStatus = null;
+let lastMotionElapsedMs = null;
 let motionAnalysisSegments = [];
 const motionDebugHistory = [];
 const MOTION_DEBUG_HISTORY_LIMIT = 120;
@@ -303,6 +307,10 @@ function resetMotionAnalysis(status = 'waiting for Spotify audio analysis'){
   motionAnalysisRequestId++;
   motionAnalysisInFlight=false;
   motionAnalysisRetryAt=0;
+  lastMotionRequestId=null;
+  lastMotionServerRequestId=null;
+  lastMotionHttpStatus=null;
+  lastMotionElapsedMs=null;
   motionDebugHistory.length=0;
   motionTrack=null;
   motionAnalysisSegments=[];
@@ -321,6 +329,12 @@ async function loadSpotifyAnalysis(trackId, force=false){
   if(!force && Date.now()<motionAnalysisRetryAt) return;
   const requestId=++motionAnalysisRequestId;
   const trackIdAtStart=trackId;
+  const diagnosticId='motion-'+Date.now().toString(36)+'-'+requestId;
+  const requestStartedAt=performance.now();
+  lastMotionRequestId=diagnosticId;
+  lastMotionServerRequestId=null;
+  lastMotionHttpStatus=null;
+  lastMotionElapsedMs=null;
   motionAnalysisInFlight=true;
   motionAnalysisStatus='fetching Spotify audio analysis…';
   motionAnalysisSource='Spotify Web Player audio-analysis';
@@ -328,6 +342,8 @@ async function loadSpotifyAnalysis(trackId, force=false){
   renderMotionDebug();
   try{
     const data=await api('/api/spotify/analysis?trackId='+encodeURIComponent(trackIdAtStart));
+    lastMotionElapsedMs=Math.round(performance.now()-requestStartedAt);
+    lastMotionHttpStatus=200;
     if(requestId!==motionAnalysisRequestId || trackIdAtStart!==currentTrackId) return;
     const segments=Array.isArray(data.segments)?data.segments.filter(segment=>
       Number.isFinite(segment?.start) &&
@@ -351,6 +367,9 @@ async function loadSpotifyAnalysis(trackId, force=false){
     if(requestId!==motionAnalysisRequestId || trackIdAtStart!==currentTrackId) return;
     motionTrack=null;
     motionAnalysisSegments=[];
+    lastMotionElapsedMs=Math.round(performance.now()-requestStartedAt);
+    lastMotionHttpStatus=Number.isFinite(error?.status)?error.status:null;
+    lastMotionServerRequestId=error?.requestId||null;
     motionAnalysisStatus='analysis unavailable: '+(error?.message||String(error));
     motionAnalysisSource='Spotify audio-analysis request';
     motionAnalysisLabel=trackIdAtStart;
@@ -383,6 +402,11 @@ function motionDebugSnapshot(){
     analysisStatus: motionAnalysisStatus,
     analysisTrackId: motionAnalysisLabel || null,
     analysisInFlight: motionAnalysisInFlight,
+    lastRequestId: lastMotionRequestId,
+    serverRequestId: lastMotionServerRequestId,
+    lastHttpStatus: lastMotionHttpStatus,
+    lastRequestElapsedMs: lastMotionElapsedMs,
+    retryCooldownMs: Math.max(0, motionAnalysisRetryAt-Date.now()),
     currentSegmentIndex,
     currentSegment: currentSegment ? {
       start: Number(currentSegment.start.toFixed(3)),
@@ -697,7 +721,7 @@ function say(message){ $('status').textContent = message; }
 async function api(path, options={}) {
   const response = await fetch(path, { credentials:'same-origin', cache:'no-store', ...options });
   const data = response.status === 204 ? {} : await response.json().catch(()=>({}));
-  if (!response.ok) { const error = new Error(data.error || 'Request failed ('+response.status+')'); error.details = data.details || ''; error.status = response.status; throw error; }
+  if (!response.ok) { const error = new Error(data.error || 'Request failed ('+response.status+')'); error.details = data.details || ''; error.status = response.status; error.requestId = response.headers.get('x-request-id') || response.headers.get('cf-ray') || null; throw error; }
   return data;
 }
 function clearTrack(){ $('track').hidden=true; $('nowbar').hidden=true; $('cover').style.display='none'; }
