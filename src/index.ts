@@ -473,6 +473,11 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const trackId = url.searchParams.get("trackId") || "";
     if (!/^[A-Za-z0-9]{22}$/.test(trackId)) return json({ error: "invalid_track_id" }, 400);
 
+    // Staged diagnostics: add ?debug=1 to see which step failed. Never includes any token.
+    const debug = url.searchParams.get("debug") === "1";
+    const diag: Record<string, unknown> = {};
+    const fail = (stage: string) => json(debug ? { error: "analysis_unavailable", stage, diag } : { error: "analysis_unavailable" }, 502);
+
     // Only fetch analysis for the account's currently playing track.
     let playbackResponse: Response;
     try {
@@ -480,11 +485,13 @@ async function handle(request: Request, env: Env): Promise<Response> {
       playbackResponse = await fetch(API_URL + "/me/player/currently-playing", {
         headers: { authorization: "Bearer " + await decrypt(env, freshSession.access_token_enc), accept: "application/json" },
       });
-    } catch {
-      return json({ error: "analysis_unavailable" }, 502);
+    } catch (error) {
+      diag.thrown = error instanceof Error ? error.message : String(error);
+      return fail("playback_fetch");
     }
+    diag.playbackStatus = playbackResponse.status;
     if (playbackResponse.status === 204 || playbackResponse.status === 202) return json({ error: "nothing_playing" }, 404);
-    if (!playbackResponse.ok) return json({ error: "analysis_unavailable" }, 502);
+    if (!playbackResponse.ok) return fail("playback_status");
     const playback = await playbackResponse.json() as any;
     if (playback?.item?.id !== trackId) return json({ error: "track_changed" }, 409);
 
@@ -493,19 +500,42 @@ async function handle(request: Request, env: Env): Promise<Response> {
       const embedResponse = await fetch("https://open.spotify.com/embed/track/" + trackId, {
         headers: { "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36" },
       });
-      if (!embedResponse.ok) return json({ error: "analysis_unavailable" }, 502);
+      diag.embedStatus = embedResponse.status;
+      diag.embedContentType = embedResponse.headers.get("content-type");
+      if (!embedResponse.ok) return fail("embed_fetch");
       const embedHtml = await embedResponse.text();
+      diag.embedHtmlLength = embedHtml.length;
       const nextDataMatch = embedHtml.match(/<script[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
-      if (!nextDataMatch) return json({ error: "analysis_unavailable" }, 502);
+      diag.nextDataFound = !!nextDataMatch;
+      if (!nextDataMatch) return fail("next_data_missing");
       const pageData = JSON.parse(nextDataMatch[1]);
-      const token = pageData?.props?.pageProps?.state?.settings?.session?.accessToken;
-      if (typeof token !== "string" || !token) return json({ error: "analysis_unavailable" }, 502);
+      // Key names only, so we learn the real shape without leaking values.
+      const embedSession = pageData?.props?.pageProps?.state?.settings?.session;
+      diag.pagePropsKeys = Object.keys(pageData?.props?.pageProps ?? {});
+      diag.settingsKeys = Object.keys(pageData?.props?.pageProps?.state?.settings ?? {});
+      diag.sessionKeys = embedSession && typeof embedSession === "object" ? Object.keys(embedSession) : null;
+      diag.isAnonymous = embedSession?.isAnonymous ?? null;
+      const token = embedSession?.accessToken;
+      diag.tokenLength = typeof token === "string" ? token.length : null;
+      if (typeof token !== "string" || !token) return fail("token_missing");
+
+      if (debug) {
+        // 200 = token belongs to a real account; 401 = anonymous/invalid.
+        const meResponse = await fetch(API_URL + "/me", { headers: { authorization: "Bearer " + token, accept: "application/json" } });
+        diag.embedTokenMeStatus = meResponse.status;
+      }
 
       const analysisResponse = await fetch("https://spclient.wg.spotify.com/audio-attributes/v1/audio-analysis/" + trackId + "?format=json", {
         headers: { authorization: "Bearer " + token, "app-platform": "WebPlayer", accept: "application/json" },
       });
-      if (!analysisResponse.ok) return json({ error: "analysis_unavailable" }, 502);
-      const analysis = await analysisResponse.json() as any;
+      diag.analysisStatus = analysisResponse.status;
+      diag.analysisContentType = analysisResponse.headers.get("content-type");
+      const analysisText = await analysisResponse.text();
+      diag.analysisBodyPreview = analysisText.slice(0, 300);
+      if (!analysisResponse.ok) return fail("analysis_fetch");
+      let analysis: any;
+      try { analysis = JSON.parse(analysisText); }
+      catch { return fail("analysis_not_json"); }
       const beats = Array.isArray(analysis?.beats) ? analysis.beats
         .filter((beat: any) => Number.isFinite(beat?.start) && Number.isFinite(beat?.duration) && beat.duration > 0)
         .map((beat: any) => ({
@@ -513,10 +543,12 @@ async function handle(request: Request, env: Env): Promise<Response> {
           duration: beat.duration,
           confidence: Number.isFinite(beat.confidence) ? beat.confidence : 0.8,
         })) : [];
-      if (!beats.length) return json({ error: "analysis_unavailable" }, 502);
+      diag.beatCount = beats.length;
+      if (!beats.length) return fail("no_beats");
       return json({ trackId, tempo: Number.isFinite(analysis?.track?.tempo) ? analysis.track.tempo : null, beats });
-    } catch {
-      return json({ error: "analysis_unavailable" }, 502);
+    } catch (error) {
+      diag.thrown = error instanceof Error ? error.message : String(error);
+      return fail("exception");
     }
   }
   if (path === "/api/lyrics" && request.method === "GET") {
