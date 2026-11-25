@@ -134,6 +134,8 @@ let motionLastDebugUpdate = 0;
 let motionAnalysisRequestId = 0;
 let motionAnalysisInFlight = false;
 let motionAnalysisRetryAt = 0;
+let motionAnalysisFailures = 0;
+const MOTION_ANALYSIS_MAX_FAILURES = 5;
 let lastMotionRequestId = null;
 let lastMotionServerRequestId = null;
 let lastMotionHttpStatus = null;
@@ -307,6 +309,7 @@ function resetMotionAnalysis(status = 'waiting for Spotify audio analysis'){
   motionAnalysisRequestId++;
   motionAnalysisInFlight=false;
   motionAnalysisRetryAt=0;
+  motionAnalysisFailures=0;
   lastMotionRequestId=null;
   lastMotionServerRequestId=null;
   lastMotionHttpStatus=null;
@@ -362,6 +365,7 @@ async function loadSpotifyAnalysis(trackId, force=false){
     motionAnalysisDuration=Number.isFinite(data.durationSeconds)?data.durationSeconds:trackDurationMs/1000;
     motionSegmentCount=segments.length;
     motionAnalysisRetryAt=0;
+    motionAnalysisFailures=0;
     renderMotionDebug();
   }catch(error){
     if(requestId!==motionAnalysisRequestId || trackIdAtStart!==currentTrackId) return;
@@ -373,7 +377,14 @@ async function loadSpotifyAnalysis(trackId, force=false){
     motionAnalysisStatus='analysis unavailable: '+(error?.message||String(error));
     motionAnalysisSource='Spotify audio-analysis request';
     motionAnalysisLabel=trackIdAtStart;
-    motionAnalysisRetryAt=Date.now()+8000;
+    motionAnalysisFailures++;
+    if(motionAnalysisFailures>=MOTION_ANALYSIS_MAX_FAILURES){
+      // Stop asking Spotify. A track change or the refresh button resets this.
+      motionAnalysisRetryAt=Date.now()+6*60*60*1000;
+      motionAnalysisStatus+=' — gave up after '+motionAnalysisFailures+' tries (change track or refresh to retry)';
+    }else{
+      motionAnalysisRetryAt=Date.now()+Math.min(8000*2**(motionAnalysisFailures-1),60000);
+    }
     renderMotionDebug();
   }finally{
     if(requestId===motionAnalysisRequestId) motionAnalysisInFlight=false;

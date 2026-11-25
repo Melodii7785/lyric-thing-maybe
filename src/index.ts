@@ -521,6 +521,22 @@ async function handle(request: Request, env: Env): Promise<Response> {
       502,
     );
 
+    // A track's analysis never changes, so serve it from D1 when we already have it and only
+    // go to Spotify on a miss. Cache trouble (e.g. the migration isn't applied yet) must never
+    // break the endpoint, so every cache step is best-effort. ?debug=1 always does a live fetch.
+    const cacheKey = "v1:" + trackId;
+    if (!debug) {
+      try {
+        const cached = await env.DB.prepare("SELECT payload FROM analysis_cache WHERE cache_key = ? AND cached_at > ?")
+          .bind(cacheKey, Date.now() - 90 * 24 * 60 * 60 * 1000).first<{ payload: string }>();
+        if (cached?.payload) {
+          return new Response(cached.payload, {
+            headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-analysis-cache": "hit" },
+          });
+        }
+      } catch { /* fall through to a live fetch */ }
+    }
+
     // Only fetch analysis for the account's currently playing track.
     let playbackResponse: Response;
     try {
@@ -594,12 +610,17 @@ async function handle(request: Request, env: Env): Promise<Response> {
         .filter((segment: any) => Number.isFinite(segment.start) && Number.isFinite(segment.loudnessStart) && Number.isFinite(segment.loudnessMax) && Number.isFinite(segment.peakAt));
       diag.segmentCount = segments.length;
       if (!segments.length) return fail("no_segments", "No usable energy segments were returned.");
-      return json({
+      const body = {
         trackId,
         tempo: Number.isFinite(analysis?.track?.tempo) ? analysis.track.tempo : null,
         durationSeconds: Number.isFinite(analysis?.track?.duration) ? analysis.track.duration : null,
         segments,
-      });
+      };
+      try {
+        await env.DB.prepare("INSERT OR REPLACE INTO analysis_cache (cache_key, payload, cached_at) VALUES (?, ?, ?)")
+          .bind(cacheKey, JSON.stringify(body), Date.now()).run();
+      } catch { /* cache is best-effort */ }
+      return json(body, 200, { "x-analysis-cache": "miss" });
     } catch (error) {
       diag.thrown = error instanceof Error ? error.message : String(error);
       return fail("exception");
