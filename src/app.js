@@ -134,6 +134,99 @@ let motionLastDebugUpdate = 0;
 let motionAnalysisRequestId = 0;
 let motionAnalysisInFlight = false;
 let motionAnalysisRetryAt = 0;
+let motionAnalysisFailures = 0;
+const MOTION_ANALYSIS_MAX_FAILURES = 5;
+
+// --- Beat haptics: buzz the phone on each beat (Android/Chrome; iOS has no Vibration API) ---
+const HAPTICS_SUPPORTED = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+const HAPTIC_LEAD_SECONDS = 0.03;     // fire slightly early to cover motor spin-up
+const HAPTIC_STALE_SECONDS = 0.2;     // never fire a beat that is already this far behind
+const HAPTIC_MIN_GAP_SECONDS = 0.12;  // don't stack buzzes on very fast tempos
+const HAPTIC_MIN_CONFIDENCE = 0.15;
+const HAPTIC_MIN_MS = 14;
+const HAPTIC_MAX_MS = 45;
+let hapticsEnabled = false;
+let hapticBeats = [];        // [{t: seconds, ms: buzz length}]
+let hapticNextIndex = 0;
+let hapticLastPosition = 0;
+let hapticLastFiredAt = -1;
+function hapticsLoadPreference(){
+  try { return localStorage.getItem('beat-haptics') === '1'; } catch { return false; }
+}
+function hapticsSavePreference(on){
+  try { localStorage.setItem('beat-haptics', on ? '1' : '0'); } catch {}
+}
+// Strength per beat comes from the segment it lands in: a big jump between a segment's
+// starting loudness and its peak is a sharp attack (a drum hit), so it gets a longer buzz.
+function buildHapticBeats(beats, segments){
+  if(!Array.isArray(beats) || !beats.length) return [];
+  const segs = Array.isArray(segments) ? segments : [];
+  let s = 0;
+  const out = [];
+  const sorted = beats
+    .filter(b => Number.isFinite(b?.start) && (b.confidence === undefined || b.confidence >= HAPTIC_MIN_CONFIDENCE))
+    .sort((a, b) => a.start - b.start);
+  for(const beat of sorted){
+    while(s + 1 < segs.length && segs[s + 1].start <= beat.start) s++;
+    const seg = segs[s];
+    const attack = seg ? Math.max(0, seg.loudnessMax - seg.loudnessStart) : 0;
+    const strength = Math.min(1, attack / 20);
+    out.push({ t: beat.start, ms: Math.round(HAPTIC_MIN_MS + strength * (HAPTIC_MAX_MS - HAPTIC_MIN_MS)) });
+  }
+  return out;
+}
+function hapticsSeekIndex(position){
+  let lo = 0, hi = hapticBeats.length;
+  while(lo < hi){
+    const mid = (lo + hi) >> 1;
+    if(hapticBeats[mid].t < position) lo = mid + 1; else hi = mid;
+  }
+  return lo;
+}
+function setHapticBeats(beats, segments){
+  hapticBeats = buildHapticBeats(beats, segments);
+  hapticNextIndex = hapticsSeekIndex(currentPlaybackSeconds());
+  hapticLastPosition = currentPlaybackSeconds();
+}
+function resetHaptics(){
+  hapticBeats = [];
+  hapticNextIndex = 0;
+  hapticLastFiredAt = -1;
+  if(HAPTICS_SUPPORTED) try { navigator.vibrate(0); } catch {}
+}
+function stepHaptics(position){
+  if(!HAPTICS_SUPPORTED || !hapticsEnabled || !isPlaying || !hapticBeats.length) { hapticLastPosition = position; return; }
+  // A seek or a long stall (tab was hidden) means our place in the beat list is wrong: find it again.
+  if(Math.abs(position - hapticLastPosition) > 1){
+    hapticNextIndex = hapticsSeekIndex(position);
+    hapticLastFiredAt = -1; // after a backwards seek the old "last buzz" is in the future and would mute everything
+  }
+  hapticLastPosition = position;
+  while(hapticNextIndex < hapticBeats.length && hapticBeats[hapticNextIndex].t <= position + HAPTIC_LEAD_SECONDS){
+    const beat = hapticBeats[hapticNextIndex++];
+    if(position - beat.t > HAPTIC_STALE_SECONDS) continue;
+    if(hapticLastFiredAt >= 0 && beat.t >= hapticLastFiredAt && beat.t - hapticLastFiredAt < HAPTIC_MIN_GAP_SECONDS) continue;
+    hapticLastFiredAt = beat.t;
+    try { navigator.vibrate(beat.ms); } catch {}
+  }
+}
+function setHapticsEnabled(on){
+  hapticsEnabled = on && HAPTICS_SUPPORTED;
+  hapticsSavePreference(hapticsEnabled);
+  const button = $('haptics-toggle');
+  if(button){
+    button.setAttribute('aria-pressed', String(hapticsEnabled));
+    button.textContent = 'feel the music: ' + (hapticsEnabled ? 'on' : 'off');
+  }
+  if(hapticsEnabled){
+    hapticNextIndex = hapticsSeekIndex(currentPlaybackSeconds());
+    hapticLastPosition = currentPlaybackSeconds();
+    // This tap is also the user gesture Chrome requires before vibration is allowed at all.
+    try { navigator.vibrate(30); } catch {}
+  } else if(HAPTICS_SUPPORTED){
+    try { navigator.vibrate(0); } catch {}
+  }
+}
 let lastMotionRequestId = null;
 let lastMotionServerRequestId = null;
 let lastMotionHttpStatus = null;
@@ -307,6 +400,8 @@ function resetMotionAnalysis(status = 'waiting for Spotify audio analysis'){
   motionAnalysisRequestId++;
   motionAnalysisInFlight=false;
   motionAnalysisRetryAt=0;
+  motionAnalysisFailures=0;
+  resetHaptics();
   lastMotionRequestId=null;
   lastMotionServerRequestId=null;
   lastMotionHttpStatus=null;
@@ -353,6 +448,7 @@ async function loadSpotifyAnalysis(trackId, force=false){
     ).sort((a,b)=>a.start-b.start): [];
     if(!segments.length) throw new Error('Spotify returned no usable energy segments.');
     motionAnalysisSegments=segments;
+    setHapticBeats(data.beats, segments);
     motionTrack=new TrackMotion({segments});
     motionClock=new MotionClock();
     motionClock.seed(currentPlaybackSeconds());
@@ -362,6 +458,7 @@ async function loadSpotifyAnalysis(trackId, force=false){
     motionAnalysisDuration=Number.isFinite(data.durationSeconds)?data.durationSeconds:trackDurationMs/1000;
     motionSegmentCount=segments.length;
     motionAnalysisRetryAt=0;
+    motionAnalysisFailures=0;
     renderMotionDebug();
   }catch(error){
     if(requestId!==motionAnalysisRequestId || trackIdAtStart!==currentTrackId) return;
@@ -373,7 +470,14 @@ async function loadSpotifyAnalysis(trackId, force=false){
     motionAnalysisStatus='analysis unavailable: '+(error?.message||String(error));
     motionAnalysisSource='Spotify audio-analysis request';
     motionAnalysisLabel=trackIdAtStart;
-    motionAnalysisRetryAt=Date.now()+8000;
+    motionAnalysisFailures++;
+    if(motionAnalysisFailures>=MOTION_ANALYSIS_MAX_FAILURES){
+      // Stop asking Spotify. A track change or the refresh button resets this.
+      motionAnalysisRetryAt=Date.now()+6*60*60*1000;
+      motionAnalysisStatus+=' — gave up after '+motionAnalysisFailures+' tries (change track or refresh to retry)';
+    }else{
+      motionAnalysisRetryAt=Date.now()+Math.min(8000*2**(motionAnalysisFailures-1),60000);
+    }
     renderMotionDebug();
   }finally{
     if(requestId===motionAnalysisRequestId) motionAnalysisInFlight=false;
@@ -1521,6 +1625,20 @@ $('lyrics-zoom-save').addEventListener('click',()=>{
     $('lyrics-zoom-save').textContent='could not save. storage said no.';
   }
 });
+{
+  const hapticsButton=$('haptics-toggle');
+  if(hapticsButton){
+    if(!HAPTICS_SUPPORTED){
+      // iOS Safari (and every iOS browser) has no Vibration API, so hide the control there.
+      hapticsButton.hidden=true;
+    }else{
+      hapticsEnabled=hapticsLoadPreference();
+      hapticsButton.setAttribute('aria-pressed',String(hapticsEnabled));
+      hapticsButton.textContent='feel the music: '+(hapticsEnabled?'on':'off');
+      hapticsButton.addEventListener('click',()=>setHapticsEnabled(!hapticsEnabled));
+    }
+  }
+}
 $('renderer-toggle-button').addEventListener('click',()=>{
   if(!currentSpicyLyricsData) return;
   lyricRendererMode=lyricRendererMode==='amll'?'port':'amll';
@@ -1629,6 +1747,7 @@ function animateAMLL(frameTime){
   const delta=lastFrameTime===null?0:frameTime-lastFrameTime;
   lastFrameTime=frameTime;
   motionLastFrameDeltaMs=delta;
+  stepHaptics(currentPlaybackSeconds());
   const motionFrame=motionClock.step(delta/1000,currentPlaybackSeconds(),isPlaying,motionTrack);
   if(kawarp){
     kawarp.animationSpeed=motionTrack ? motionFrame.rate : 1;
