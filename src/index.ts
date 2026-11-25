@@ -524,7 +524,8 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // A track's analysis never changes, so serve it from D1 when we already have it and only
     // go to Spotify on a miss. Cache trouble (e.g. the migration isn't applied yet) must never
     // break the endpoint, so every cache step is best-effort. ?debug=1 always does a live fetch.
-    const cacheKey = "v1:" + trackId;
+    // v2: payload now includes beats (v1 entries only had segments, so they are ignored).
+    const cacheKey = "v2:" + trackId;
     if (!debug) {
       try {
         const cached = await env.DB.prepare("SELECT payload FROM analysis_cache WHERE cache_key = ? AND cached_at > ?")
@@ -609,12 +610,24 @@ async function handle(request: Request, env: Env): Promise<Response> {
         }))
         .filter((segment: any) => Number.isFinite(segment.start) && Number.isFinite(segment.loudnessStart) && Number.isFinite(segment.loudnessMax) && Number.isFinite(segment.peakAt));
       diag.segmentCount = segments.length;
+      // Beats drive the phone-vibration feature. Missing beats must not fail the request.
+      const rawBeats: any[] = Array.isArray(analysis?.beats) ? analysis.beats : [];
+      const beats = rawBeats
+        .filter((beat: any) => Number.isFinite(beat?.start) && Number.isFinite(beat?.duration) && beat.duration > 0)
+        .map((beat: any) => ({
+          start: beat.start,
+          duration: beat.duration,
+          confidence: Number.isFinite(beat.confidence) ? beat.confidence : 0.8,
+        }));
+      diag.rawBeatCount = rawBeats.length;
+      diag.beatCount = beats.length;
       if (!segments.length) return fail("no_segments", "No usable energy segments were returned.");
       const body = {
         trackId,
         tempo: Number.isFinite(analysis?.track?.tempo) ? analysis.track.tempo : null,
         durationSeconds: Number.isFinite(analysis?.track?.duration) ? analysis.track.duration : null,
         segments,
+        beats,
       };
       try {
         await env.DB.prepare("INSERT OR REPLACE INTO analysis_cache (cache_key, payload, cached_at) VALUES (?, ?, ?)")
