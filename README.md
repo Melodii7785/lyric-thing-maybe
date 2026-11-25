@@ -84,6 +84,7 @@ this project builds on the work of other people. big thanks to:
 
 - [AMLL / Apple Music Like Lyrics](https://github.com/amll-dev/applemusic-like-lyrics) for the Apple Music-style lyric renderer.
 - [Spicy Lyrics](https://github.com/Spikerko/spicy-lyrics) and the original [Spicy Lyrics web implementation](https://github.com/Mathr81/spicy-lyrics-web), for the renderer this project ports and adapts.
+- [Spicy Lyrics Mobile](https://github.com/spicylyrics/mobile) (AGPL-3.0), for the music haptics (the "feel the music" button) and the audio-analysis background motion. `src/renderer/haptics/MusicHapticScore.ts` is a TypeScript port of its `MusicHapticScore.kt` and `Rhythm.kt`; the web version plays pulses as `navigator.vibrate` patterns, since browsers have no amplitude control.
 
 please see the upstream projects for their own contributors, notices, and licensing details. this README is not trying to steal anybody's homework.
 

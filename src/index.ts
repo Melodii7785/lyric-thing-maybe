@@ -524,8 +524,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // A track's analysis never changes, so serve it from D1 when we already have it and only
     // go to Spotify on a miss. Cache trouble (e.g. the migration isn't applied yet) must never
     // break the endpoint, so every cache step is best-effort. ?debug=1 always does a live fetch.
-    // v2: payload now includes beats (v1 entries only had segments, so they are ignored).
-    const cacheKey = "v2:" + trackId;
+    // v3: payload now carries what the drum haptics need (rhythmstring, sections, bars, loudness,
+    // segment timbre) and an absolute peakAt. Older entries are ignored and refetched once.
+    const cacheKey = "v3:" + trackId;
     if (!debug) {
       try {
         const cached = await env.DB.prepare("SELECT payload FROM analysis_cache WHERE cache_key = ? AND cached_at > ?")
@@ -601,12 +602,21 @@ async function handle(request: Request, env: Env): Promise<Response> {
       const rawSegments: any[] = Array.isArray(analysis?.segments) ? analysis.segments : [];
       diag.rawSegmentCount = rawSegments.length;
       diag.firstSegmentKeys = rawSegments[0] && typeof rawSegments[0] === "object" ? Object.keys(rawSegments[0]) : null;
+      const num = (value: unknown, fallback = 0): number => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
+      const round = (value: number, digits = 3): number => Math.round(value * 10 ** digits) / 10 ** digits;
       const segments = rawSegments
         .map((segment: any) => ({
           start: segment?.start,
           loudnessStart: segment?.loudness_start ?? segment?.loudnessStart,
           loudnessMax: segment?.loudness_max ?? segment?.loudnessMax,
-          peakAt: segment?.loudness_max_time ?? segment?.peakAt,
+          // Spotify gives the peak's offset inside the segment; consumers want it as an absolute time.
+          peakAt: Number.isFinite(segment?.loudness_max_time) && Number.isFinite(segment?.start)
+            ? segment.start + segment.loudness_max_time
+            : segment?.peakAt,
+          // Timbre coefficients 1, 4 and 9 tell a snare from a kick (only comparable within one track).
+          brightness: num(segment?.timbre?.[1]),
+          timbre4: num(segment?.timbre?.[4]),
+          timbre9: num(segment?.timbre?.[9]),
         }))
         .filter((segment: any) => Number.isFinite(segment.start) && Number.isFinite(segment.loudnessStart) && Number.isFinite(segment.loudnessMax) && Number.isFinite(segment.peakAt));
       diag.segmentCount = segments.length;
@@ -621,13 +631,45 @@ async function handle(request: Request, env: Env): Promise<Response> {
         }));
       diag.rawBeatCount = rawBeats.length;
       diag.beatCount = beats.length;
+
+      // The rest of what the drum haptics read: bars (downbeats), sections, track loudness, and the
+      // per-band onset string. All optional: without them the page falls back to the steady beat.
+      const track = analysis?.track ?? {};
+      const durationSeconds = Number.isFinite(track?.duration) ? track.duration : null;
+      const bars = (Array.isArray(analysis?.bars) ? analysis.bars : [])
+        .map((bar: any) => bar?.start)
+        .filter((start: unknown): start is number => typeof start === "number" && Number.isFinite(start))
+        .map((start: number) => round(start));
+      let sections = (Array.isArray(analysis?.sections) ? analysis.sections : [])
+        .filter((section: any) => Number.isFinite(section?.start) && Number.isFinite(section?.duration) && Number.isFinite(section?.loudness))
+        .map((section: any) => ({ start: round(section.start), duration: round(section.duration), loudness: round(section.loudness), tempo: num(section.tempo) }));
+      if (!sections.length && durationSeconds !== null && Number.isFinite(track?.loudness)) {
+        sections = [{ start: 0, duration: durationSeconds, loudness: track.loudness, tempo: num(track.tempo) }];
+      }
+      const rhythmstring = typeof track?.rhythmstring === "string" && track.rhythmstring ? track.rhythmstring : null;
+      diag.barCount = bars.length;
+      diag.sectionCount = sections.length;
+      diag.rhythmstringLength = rhythmstring ? rhythmstring.length : null;
       if (!segments.length) return fail("no_segments", "No usable energy segments were returned.");
       const body = {
         trackId,
-        tempo: Number.isFinite(analysis?.track?.tempo) ? analysis.track.tempo : null,
-        durationSeconds: Number.isFinite(analysis?.track?.duration) ? analysis.track.duration : null,
-        segments,
-        beats,
+        tempo: Number.isFinite(track?.tempo) ? track.tempo : null,
+        durationSeconds,
+        loudness: Number.isFinite(track?.loudness) ? track.loudness : null,
+        // Rounded to the millisecond (or thousandth of a dB), which is all anything reads, to keep the payload small.
+        segments: segments.map((segment: any) => ({
+          start: round(segment.start),
+          loudnessStart: round(segment.loudnessStart),
+          loudnessMax: round(segment.loudnessMax),
+          peakAt: round(segment.peakAt),
+          brightness: round(segment.brightness),
+          timbre4: round(segment.timbre4),
+          timbre9: round(segment.timbre9),
+        })),
+        beats: beats.map((beat: any) => ({ start: round(beat.start), duration: round(beat.duration), confidence: round(beat.confidence) })),
+        bars,
+        sections,
+        rhythmstring,
       };
       try {
         await env.DB.prepare("INSERT OR REPLACE INTO analysis_cache (cache_key, payload, cached_at) VALUES (?, ?, ?)")

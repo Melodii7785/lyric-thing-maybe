@@ -12,6 +12,8 @@ import { $bloomMode, $simpleLyricsMode, $joinSplitWords, $smoothScrolling } from
 import { LyricsObject } from './renderer/spicy/original/utils/Lyrics/lyrics.ts';
 import { MotionClock, MOTION_TUNING } from './renderer/kawarp/MotionClock.ts';
 import { TrackMotion } from './renderer/kawarp/TrackMotion.ts';
+import { Rhythm, buildMusicHapticScore } from './renderer/haptics/MusicHapticScore.ts';
+import { pulseToPattern } from './renderer/haptics/VibrationPatterns.ts';
 
 const $ = id => document.getElementById(id);
 let poller = null;
@@ -137,77 +139,99 @@ let motionAnalysisRetryAt = 0;
 let motionAnalysisFailures = 0;
 const MOTION_ANALYSIS_MAX_FAILURES = 5;
 
-// --- Beat haptics: buzz the phone on each beat (Android/Chrome; iOS has no Vibration API) ---
+// --- Music haptics: buzz the phone to the drums (Android/Chrome; iOS has no Vibration API) ---
+// The score (kicks, snares, grooves, drops) is ported from Spicy Lyrics Mobile; see
+// src/renderer/haptics/. With no rhythm in the analysis it falls back to the steady beat.
 const HAPTICS_SUPPORTED = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
-const HAPTIC_LEAD_SECONDS = 0.03;     // fire slightly early to cover motor spin-up
-const HAPTIC_STALE_SECONDS = 0.2;     // never fire a beat that is already this far behind
-const HAPTIC_MIN_GAP_SECONDS = 0.12;  // don't stack buzzes on very fast tempos
-const HAPTIC_MIN_CONFIDENCE = 0.15;
-const HAPTIC_MIN_MS = 14;
-const HAPTIC_MAX_MS = 45;
+const HAPTIC_LEAD_MS = 30;  // fire slightly early to cover motor spin-up
+const HAPTIC_LATE_MS = 70;  // a pulse this far behind (a stall) is dropped, never played late
 let hapticsEnabled = false;
-let hapticBeats = [];        // [{t: seconds, ms: buzz length}]
+let hapticData = null;      // the analysis payload for the current track
+let hapticScore = [];       // [{atMs, pulse, strength, roomMs}] for the current track
+let hapticScoreFor = null;  // the trackId the score was built for
+let hapticBuildToken = 0;
 let hapticNextIndex = 0;
 let hapticLastPosition = 0;
-let hapticLastFiredAt = -1;
+let hapticBuzzing = false;
 function hapticsLoadPreference(){
   try { return localStorage.getItem('beat-haptics') === '1'; } catch { return false; }
 }
 function hapticsSavePreference(on){
   try { localStorage.setItem('beat-haptics', on ? '1' : '0'); } catch {}
 }
-// Strength per beat comes from the segment it lands in: a big jump between a segment's
-// starting loudness and its peak is a sharp attack (a drum hit), so it gets a longer buzz.
-function buildHapticBeats(beats, segments){
-  if(!Array.isArray(beats) || !beats.length) return [];
-  const segs = Array.isArray(segments) ? segments : [];
-  let s = 0;
-  const out = [];
-  const sorted = beats
-    .filter(b => Number.isFinite(b?.start) && (b.confidence === undefined || b.confidence >= HAPTIC_MIN_CONFIDENCE))
-    .sort((a, b) => a.start - b.start);
-  for(const beat of sorted){
-    while(s + 1 < segs.length && segs[s + 1].start <= beat.start) s++;
-    const seg = segs[s];
-    const attack = seg ? Math.max(0, seg.loudnessMax - seg.loudnessStart) : 0;
-    const strength = Math.min(1, attack / 20);
-    out.push({ t: beat.start, ms: Math.round(HAPTIC_MIN_MS + strength * (HAPTIC_MAX_MS - HAPTIC_MIN_MS)) });
-  }
-  return out;
-}
-function hapticsSeekIndex(position){
-  let lo = 0, hi = hapticBeats.length;
+function hapticsSeekIndex(positionMs){
+  let lo = 0, hi = hapticScore.length;
   while(lo < hi){
     const mid = (lo + hi) >> 1;
-    if(hapticBeats[mid].t < position) lo = mid + 1; else hi = mid;
+    if(hapticScore[mid].atMs < positionMs) lo = mid + 1; else hi = mid;
   }
   return lo;
 }
-function setHapticBeats(beats, segments){
-  hapticBeats = buildHapticBeats(beats, segments);
-  hapticNextIndex = hapticsSeekIndex(currentPlaybackSeconds());
-  hapticLastPosition = currentPlaybackSeconds();
+// Decoding the rhythm string is async and the score is a little CPU work, so it only happens
+// while the feature is on, and a track change cancels a build still in flight.
+async function buildHapticScore(){
+  const data = hapticData;
+  if(!HAPTICS_SUPPORTED || !hapticsEnabled || !data || hapticScoreFor === data.trackId) return;
+  const token = ++hapticBuildToken;
+  const rhythm = data.rhythmstring ? await Rhythm.parse(data.rhythmstring) : null;
+  if(token !== hapticBuildToken) return;
+  try {
+    hapticScore = buildMusicHapticScore({
+      tempo: Number.isFinite(data.tempo) ? data.tempo : 0,
+      // Without the track's overall loudness, a typical value keeps the relative levels sensible.
+      loudness: Number.isFinite(data.loudness) ? data.loudness : -8,
+      sections: Array.isArray(data.sections) ? data.sections : [],
+      beats: Array.isArray(data.beats) ? data.beats : [],
+      bars: Array.isArray(data.bars) ? data.bars : [],
+      segments: (Array.isArray(data.segments) ? data.segments : []).map(s => ({
+        ...s,
+        peakAt: Number.isFinite(s.peakAt) ? s.peakAt : s.start,
+        brightness: Number(s.brightness) || 0,
+        timbre4: Number(s.timbre4) || 0,
+        timbre9: Number(s.timbre9) || 0,
+      })),
+      rhythm,
+    });
+    hapticScoreFor = data.trackId;
+    hapticNextIndex = hapticsSeekIndex(currentPlaybackSeconds() * 1000);
+    hapticLastPosition = currentPlaybackSeconds();
+  } catch(error) {
+    console.warn('[haptics] could not build the score', error);
+    hapticScore = [];
+  }
+}
+function setHapticAnalysis(data){
+  hapticData = data;
+  hapticScore = [];
+  hapticScoreFor = null;
+  void buildHapticScore();
+}
+function stopHapticBuzz(){
+  if(HAPTICS_SUPPORTED && hapticBuzzing){ try { navigator.vibrate(0); } catch {} }
+  hapticBuzzing = false;
 }
 function resetHaptics(){
-  hapticBeats = [];
+  hapticBuildToken++;
+  hapticData = null;
+  hapticScore = [];
+  hapticScoreFor = null;
   hapticNextIndex = 0;
-  hapticLastFiredAt = -1;
-  if(HAPTICS_SUPPORTED) try { navigator.vibrate(0); } catch {}
+  stopHapticBuzz();
 }
 function stepHaptics(position){
-  if(!HAPTICS_SUPPORTED || !hapticsEnabled || !isPlaying || !hapticBeats.length) { hapticLastPosition = position; return; }
-  // A seek or a long stall (tab was hidden) means our place in the beat list is wrong: find it again.
-  if(Math.abs(position - hapticLastPosition) > 1){
-    hapticNextIndex = hapticsSeekIndex(position);
-    hapticLastFiredAt = -1; // after a backwards seek the old "last buzz" is in the future and would mute everything
+  if(!HAPTICS_SUPPORTED || !hapticsEnabled || !isPlaying || !hapticScore.length){
+    hapticLastPosition = position;
+    if(!isPlaying) stopHapticBuzz();
+    return;
   }
+  const positionMs = position * 1000;
+  // A seek or a long stall (tab was hidden) means our place in the score is wrong: find it again.
+  if(Math.abs(position - hapticLastPosition) > 1) hapticNextIndex = hapticsSeekIndex(positionMs);
   hapticLastPosition = position;
-  while(hapticNextIndex < hapticBeats.length && hapticBeats[hapticNextIndex].t <= position + HAPTIC_LEAD_SECONDS){
-    const beat = hapticBeats[hapticNextIndex++];
-    if(position - beat.t > HAPTIC_STALE_SECONDS) continue;
-    if(hapticLastFiredAt >= 0 && beat.t >= hapticLastFiredAt && beat.t - hapticLastFiredAt < HAPTIC_MIN_GAP_SECONDS) continue;
-    hapticLastFiredAt = beat.t;
-    try { navigator.vibrate(beat.ms); } catch {}
+  while(hapticNextIndex < hapticScore.length && hapticScore[hapticNextIndex].atMs <= positionMs + HAPTIC_LEAD_MS){
+    const event = hapticScore[hapticNextIndex++];
+    if(positionMs - event.atMs > HAPTIC_LATE_MS) continue;
+    try { navigator.vibrate(pulseToPattern(event.pulse, event.strength, event.roomMs)); hapticBuzzing = true; } catch {}
   }
 }
 function setHapticsEnabled(on){
@@ -219,12 +243,14 @@ function setHapticsEnabled(on){
     button.textContent = 'feel the music: ' + (hapticsEnabled ? 'on' : 'off');
   }
   if(hapticsEnabled){
-    hapticNextIndex = hapticsSeekIndex(currentPlaybackSeconds());
+    void buildHapticScore();
+    hapticNextIndex = hapticsSeekIndex(currentPlaybackSeconds() * 1000);
     hapticLastPosition = currentPlaybackSeconds();
     // This tap is also the user gesture Chrome requires before vibration is allowed at all.
-    try { navigator.vibrate(30); } catch {}
-  } else if(HAPTICS_SUPPORTED){
-    try { navigator.vibrate(0); } catch {}
+    try { navigator.vibrate(30); hapticBuzzing = true; } catch {}
+  } else {
+    hapticBuildToken++;
+    stopHapticBuzz();
   }
 }
 let lastMotionRequestId = null;
@@ -448,7 +474,7 @@ async function loadSpotifyAnalysis(trackId, force=false){
     ).sort((a,b)=>a.start-b.start): [];
     if(!segments.length) throw new Error('Spotify returned no usable energy segments.');
     motionAnalysisSegments=segments;
-    setHapticBeats(data.beats, segments);
+    setHapticAnalysis(data);
     motionTrack=new TrackMotion({segments});
     motionClock=new MotionClock();
     motionClock.seed(currentPlaybackSeconds());
