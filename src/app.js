@@ -146,6 +146,7 @@ const HAPTICS_SUPPORTED = typeof navigator !== 'undefined' && typeof navigator.v
 const HAPTIC_LEAD_MS = 30;  // fire slightly early to cover motor spin-up
 const HAPTIC_LATE_MS = 70;  // a pulse this far behind (a stall) is dropped, never played late
 let hapticsEnabled = false;
+let hapticsStyle = 'drums'; // 'drums' | 'beat'
 let hapticData = null;      // the analysis payload for the current track
 let hapticScore = [];       // [{atMs, pulse, strength, roomMs}] for the current track
 let hapticScoreFor = null;  // the trackId the score was built for
@@ -159,6 +160,12 @@ function hapticsLoadPreference(){
 function hapticsSavePreference(on){
   try { localStorage.setItem('beat-haptics', on ? '1' : '0'); } catch {}
 }
+function hapticsLoadStyle(){
+  try { return localStorage.getItem('lyricthing.hapticsStyle') === 'beat' ? 'beat' : 'drums'; } catch { return 'drums'; }
+}
+function hapticsSaveStyle(style){
+  try { localStorage.setItem('lyricthing.hapticsStyle', style); } catch {}
+}
 function hapticsSeekIndex(positionMs){
   let lo = 0, hi = hapticScore.length;
   while(lo < hi){
@@ -171,7 +178,7 @@ function hapticsSeekIndex(positionMs){
 // while the feature is on, and a track change cancels a build still in flight.
 async function buildHapticScore(){
   const data = hapticData;
-  if(!HAPTICS_SUPPORTED || !hapticsEnabled || !data || hapticScoreFor === data.trackId) return;
+  if(!HAPTICS_SUPPORTED || !hapticsEnabled || !data || hapticScoreFor === data.trackId + ':' + hapticsStyle) return;
   const token = ++hapticBuildToken;
   const rhythm = data.rhythmstring ? await Rhythm.parse(data.rhythmstring) : null;
   if(token !== hapticBuildToken) return;
@@ -191,8 +198,8 @@ async function buildHapticScore(){
         timbre9: Number(s.timbre9) || 0,
       })),
       rhythm,
-    });
-    hapticScoreFor = data.trackId;
+    }, hapticsStyle);
+    hapticScoreFor = data.trackId + ':' + hapticsStyle;
     hapticNextIndex = hapticsSeekIndex(currentPlaybackSeconds() * 1000);
     hapticLastPosition = currentPlaybackSeconds();
   } catch(error) {
@@ -240,7 +247,7 @@ function setHapticsEnabled(on){
   const button = $('haptics-toggle');
   if(button){
     button.setAttribute('aria-pressed', String(hapticsEnabled));
-    button.textContent = 'feel the music: ' + (hapticsEnabled ? 'on' : 'off');
+    button.textContent = 'haptics to tha son g: ' + (hapticsEnabled ? 'on' : 'off');
   }
   if(hapticsEnabled){
     void buildHapticScore();
@@ -1653,14 +1660,31 @@ $('lyrics-zoom-save').addEventListener('click',()=>{
 });
 {
   const hapticsButton=$('haptics-toggle');
+  const hapticsStyleSelect=$('haptics-style');
+  if(hapticsStyleSelect){
+    hapticsStyle=hapticsLoadStyle();
+    hapticsStyleSelect.value=hapticsStyle;
+    hapticsStyleSelect.addEventListener('change',()=>{
+      hapticsStyle=hapticsStyleSelect.value==='beat'?'beat':'drums';
+      hapticsSaveStyle(hapticsStyle);
+      // Rebuild the current track's score in the new style (a no-op while haptics are off).
+      hapticScore=[];
+      hapticScoreFor=null;
+      void buildHapticScore();
+    });
+  }
   if(hapticsButton){
     if(!HAPTICS_SUPPORTED){
-      // iOS Safari (and every iOS browser) has no Vibration API, so hide the control there.
-      hapticsButton.hidden=true;
+      // iOS Safari (and every iOS browser) has no Vibration API: show why instead of a dead switch.
+      hapticsButton.disabled=true;
+      hapticsButton.textContent='haptics to tha son g: not on this browser';
+      if(hapticsStyleSelect) hapticsStyleSelect.disabled=true;
+      const note=$('haptics-note');
+      if(note) note.textContent="this browser can't vibrate (iPhones can't, Android Chrome can), so the haptics do nothing here.";
     }else{
       hapticsEnabled=hapticsLoadPreference();
       hapticsButton.setAttribute('aria-pressed',String(hapticsEnabled));
-      hapticsButton.textContent='feel the music: '+(hapticsEnabled?'on':'off');
+      hapticsButton.textContent='haptics to tha son g: '+(hapticsEnabled?'on':'off');
       hapticsButton.addEventListener('click',()=>setHapticsEnabled(!hapticsEnabled));
     }
   }

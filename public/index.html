@@ -193,6 +193,11 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
   .actions button{flex:1 1 auto}
   #lyrics{height:55vh;max-height:65vh}
 }
+.appearance-category{border-top:1px solid #333}
+.appearance-category h3{margin:0;padding:12px 12px 0;color:#eee;font-size:.86rem;font-weight:750}
+.appearance-category .appearance-grid{border-top:0;padding-top:8px}
+.appearance-category .appearance-grid button{min-height:40px}
+.appearance-category .muted{margin:0;padding:0 12px 12px;font-size:.78rem}
 @media(prefers-reduced-motion:reduce){button{transition:none}}
 
 /* Diagnostics doctor button + report popup */
@@ -346,6 +351,19 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
         <button id="lyrics-zoom-in" class="secondary" type="button" title="Make lyrics bigger">+</button>
         <button id="lyrics-zoom-save" class="secondary" type="button" title="Save the current lyric zoom level">save size</button>
       </div>
+      <div class="appearance-category" role="group" aria-labelledby="gimmicks-title">
+        <h3 id="gimmicks-title">gimmicks, silly gags and shit like that</h3>
+        <div class="appearance-grid">
+          <button id="haptics-toggle" class="secondary" type="button" aria-pressed="false">haptics to tha son g: off</button>
+          <label class="appearance-field" for="haptics-style">what should the haptics follow
+            <select id="haptics-style">
+              <option value="drums">i want drum</option>
+              <option value="beat">i want beat</option>
+            </select>
+          </label>
+        </div>
+        <p class="muted" id="haptics-note">Android Chrome only (iPhone browsers can't vibrate). drum follows the kicks and snares; beat just ticks on every beat. saved on this device.</p>
+      </div>
       <p class="muted">These settings apply to the original Spicy Lyrics renderer and are saved on this device. click a timed lyric line to jump to its start in Spotify.</p>
     </details>
   </div>
@@ -358,7 +376,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{ou
   <input id="mobile-debug-phrase" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Hidden debug unlock phrase">
   <p id="mobile-debug-entry-status" role="status"></p>
 </form>
-<div id="top-tools"><button id="renderer-toggle-button" class="secondary" type="button" disabled>okay let's try ✨ le port ✨</button><button id="haptics-toggle" class="secondary" type="button" aria-pressed="false">feel the music: off</button><button id="motion-debug-button" class="secondary" type="button">move with the music — debug</button><button id="doctor-button" type="button">yes i am a doctor show me the reports</button></div>
+<div id="top-tools"><button id="renderer-toggle-button" class="secondary" type="button" disabled>okay let's try ✨ le port ✨</button><button id="motion-debug-button" class="secondary" type="button">move with the music — debug</button><button id="doctor-button" type="button">yes i am a doctor show me the reports</button></div>
 <div id="doctor-backdrop" role="dialog" aria-modal="true" aria-labelledby="doctor-title">
   <section id="doctor-dialog">
     <button id="doctor-close" type="button" class="secondary">close ×</button>
