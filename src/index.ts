@@ -579,14 +579,19 @@ async function handle(request: Request, env: Env): Promise<Response> {
       let analysis: any;
       try { analysis = JSON.parse(analysisText); }
       catch { return fail("analysis_not_json"); }
-      const segments = Array.isArray(analysis?.segments) ? analysis.segments
-        .filter((segment: any) => Number.isFinite(segment?.start) && Number.isFinite(segment?.loudnessStart) && Number.isFinite(segment?.loudnessMax) && Number.isFinite(segment?.peakAt))
+      // Spotify's analysis uses snake_case segment fields (loudness_start, loudness_max, loudness_max_time).
+      // Accept camelCase too, and always answer in the camelCase shape the frontend expects.
+      const rawSegments: any[] = Array.isArray(analysis?.segments) ? analysis.segments : [];
+      diag.rawSegmentCount = rawSegments.length;
+      diag.firstSegmentKeys = rawSegments[0] && typeof rawSegments[0] === "object" ? Object.keys(rawSegments[0]) : null;
+      const segments = rawSegments
         .map((segment: any) => ({
-          start: segment.start,
-          loudnessStart: segment.loudnessStart,
-          loudnessMax: segment.loudnessMax,
-          peakAt: segment.peakAt,
-        })) : [];
+          start: segment?.start,
+          loudnessStart: segment?.loudness_start ?? segment?.loudnessStart,
+          loudnessMax: segment?.loudness_max ?? segment?.loudnessMax,
+          peakAt: segment?.loudness_max_time ?? segment?.peakAt,
+        }))
+        .filter((segment: any) => Number.isFinite(segment.start) && Number.isFinite(segment.loudnessStart) && Number.isFinite(segment.loudnessMax) && Number.isFinite(segment.peakAt));
       diag.segmentCount = segments.length;
       if (!segments.length) return fail("no_segments", "No usable energy segments were returned.");
       return json({
