@@ -142,7 +142,17 @@ const MOTION_ANALYSIS_MAX_FAILURES = 5;
 // --- Music haptics: buzz the phone to the drums (Android/Chrome; iOS has no Vibration API) ---
 // The score (kicks, snares, grooves, drops) is ported from Spicy Lyrics Mobile; see
 // src/renderer/haptics/. With no rhythm in the analysis it falls back to the steady beat.
-const HAPTICS_SUPPORTED = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+// Desktop Chrome has navigator.vibrate too, but a computer has no motor, so it silently does nothing.
+// A phone or tablet has a touch-first pointer or a mobile user agent; anything else is a computer.
+function isOnComputer(){
+  try {
+    if(navigator.userAgentData && navigator.userAgentData.mobile === true) return false;
+    if(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return false;
+    return !/Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent || '');
+  } catch { return false; }
+}
+const HAPTICS_ON_COMPUTER = isOnComputer();
+const HAPTICS_SUPPORTED = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function' && !HAPTICS_ON_COMPUTER;
 const HAPTIC_LEAD_MS = 30;  // fire slightly early to cover motor spin-up
 const HAPTIC_LATE_MS = 70;  // a pulse this far behind (a stall) is dropped, never played late
 let hapticsEnabled = false;
@@ -1675,12 +1685,15 @@ $('lyrics-zoom-save').addEventListener('click',()=>{
   }
   if(hapticsButton){
     if(!HAPTICS_SUPPORTED){
-      // iOS Safari (and every iOS browser) has no Vibration API: show why instead of a dead switch.
+      // A computer has no motor; iOS Safari (and every iOS browser) has no Vibration API.
+      // Say why instead of showing a dead switch.
       hapticsButton.disabled=true;
-      hapticsButton.textContent='haptics to tha son g: not on this browser';
+      hapticsButton.textContent='haptics to tha son g: '+(HAPTICS_ON_COMPUTER?'no motor':'not on this browser');
       if(hapticsStyleSelect) hapticsStyleSelect.disabled=true;
       const note=$('haptics-note');
-      if(note) note.textContent="this browser can't vibrate (iPhones can't, Android Chrome can), so the haptics do nothing here.";
+      if(note) note.textContent=HAPTICS_ON_COMPUTER
+        ? 'u on da puter. puters dont have motors. idiot'
+        : "this browser can't vibrate (iPhones can't, Android Chrome can), so the haptics do nothing here.";
     }else{
       hapticsEnabled=hapticsLoadPreference();
       hapticsButton.setAttribute('aria-pressed',String(hapticsEnabled));
